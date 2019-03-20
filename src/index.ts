@@ -255,8 +255,8 @@ export type Many<T> = T|T[];
 export type RawAttribute<Model> = SDOMAttribute<Model>|string|number|boolean|((model: Model) => string|number|boolean);
 
 
-export function h<Model>(name: string, ...childs: SDOM<Model>[]): SDOMElement<Model>;
 export function h<Model>(name: string, attrs: Record<string, RawAttribute<Model>>, ...childs: SDOM<Model>[]): SDOMElement<Model>;
+export function h<Model>(name: string, ...childs: SDOM<Model>[]): SDOMElement<Model>;
 export function h<Model>() {
   // @ts-ignore
   const [name, attrs, childs]

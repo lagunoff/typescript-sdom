@@ -2,6 +2,7 @@
 **/.#*
 /node_modules/
 /scripts/node_modules/
+/examples/*/node_modules/
 **/*~
 **/*.kate-swp
 **/.directory
