@@ -14,8 +14,8 @@ export function zoom<A>(...keys): DFunc<A, any> {
     projPatch: (aPatch: Patch<A>) => {
       let iter: Patch<any> = aPatch;
       for (const k of keys) {
-        if (iter instanceof KeyPatch && iter._key === k) {
-          iter = iter._patch;
+        if (iter.tag === 'key' && iter.key === k) {
+          iter = iter.patch;
           continue;
         }
         return noop;
@@ -26,115 +26,118 @@ export function zoom<A>(...keys): DFunc<A, any> {
 }
 
 
-export type InferPatch1<T>
-  = T extends Array<infer A> ? ArrayPatch<A[]>
-  : T extends object ? KeyPatch<T>|Replace<T>
-  : Replace<T>;
-
-export type InferPatch<T> = InferPatch1<T>|Batch<T>|T;
-export type NonTrivialPatch<T> =
-  | KeyPatch<T>
-  | ArraySplice<T>
-  | ArraySwap<T>
-  | KeyPatch<T>
-  | Batch<T>
+export type Patch<T> =
+  | { tag: 'replace', prev: T, next: T }
+  | { tag: 'array-splice', index: number, removes: number, inserts: T[] }
+  | { tag: 'array-swap', first: number, second: number }
+  | { tag: 'key', key: string|number, patch: Patch<any> }
+  | { tag: 'batch', patches: Patch<T>[] }
 ;
 
-export type Patch<T>
-  // @ts-ignore
-  = ArrayPatch<T>
-  | KeyPatch<T>
-  | Batch<T>
-  | Replace<T>
+export type RawPatch<T> =
+  | RawPatchSimple<T>
+  | RawPatchSimple<T>[];
+
+export type RawPatchSimple<T> =
+  | { $at: Many<string|number>, patch: RawPatch<any> }
+  | { $splice: { index: number, removes: number, inserts: T[] } }
+  | { $swap: { first: number, second: number } }
+  | { $push: Many<T> }
+  | { $unshift: Many<T> }
+  | { $replace: T }
+  | { $batch: RawPatch<T>[] }
+  | { $patch: Partial<T> }
 ;
 
-export type ArrayPatch<A extends any[]> =
-  | ArraySplice<A>
-  | ArraySwap<A>
-  | KeyPatch<A>
-  | Replace<A>
-;
+export function preparePatch<T>(value: T, patch: RawPatch<T>): Patch<T> {
+  if (Array.isArray(patch)) {
+    return { tag: 'batch', patches: patch.map(p => preparePatch(value, p)) };
+  }
+  
+  if ('$at' in patch) {
+    const keys = Array.isArray(patch.$at) ? patch.$at : [patch.$at];
+    const v = keys.reduce((acc, k) => acc[k], value);
+    return keys.reduceRight<Patch<T>>((patch, key) => ({ tag: 'key', key, patch }), preparePatch(v, patch.patch));
+  }
 
-export class ArraySplice<A> {
-  constructor(
-    readonly _index: number,
-    readonly _removes: number,
-    readonly _values: A,
-  ) {}
+  if ('$splice' in patch) {
+    const { index, removes, inserts } = patch.$splice;
+    return { tag: 'array-splice', index, removes, inserts };
+  }
+  
+  if ('$swap' in patch) {
+    const { first, second } = patch.$swap;
+    return { tag: 'array-swap', first, second };
+  }
+  
+  if ('$push' in patch) {
+    const v = value as any as any[];
+    const inserts = Array.isArray(patch.$push) ? patch.$push : [patch.$push];
+    const index = v.length - 1;
+    return { tag: 'array-splice', index, removes: 0, inserts };
+  }
+  
+  if ('$unshift' in patch) {
+    const inserts = Array.isArray(patch.$unshift) ? patch.$unshift : [patch.$unshift];
+    return { tag: 'array-splice', index: 0, removes: 0, inserts };
+  }
+  
+  if ('$replace' in patch) {
+    return { tag: 'replace', prev: value, next: patch.$replace };
+  }
+  
+  if ('$batch' in patch) {
+    return { tag: 'batch', patches: patch.$batch.map(p => preparePatch(value, p)) };
+  }
+  
+  if ('$patch' in patch) {
+    return { tag: 'batch', patches: Object.keys(patch.$patch).map<Patch<any>>(key => ({ tag: 'key', key, patch: { tag: 'replace', prev: value[key], next: patch.$patch[key] } })) };
+  }
+  
+  return absurd(patch);
 }
 
-export class ArraySwap<A> {
-  constructor(
-    readonly _firstIdx: number,
-    readonly _secondIdx: number,
-  ) {}
-}
-
-export class Batch<T> {
-  constructor(
-    readonly _patches: Patch<T>[],
-  ) {}
-}
-
-export class Replace<T> {
-  constructor(
-    readonly _prev: T,
-    readonly _next: T,
-  ) {}
-}
-
-export class KeyPatch<A> {
-  constructor(
-    readonly _key: string|number,
-    readonly _patch: Patch<any>,
-  ) {}
-}
-
-export const noop: Patch<never> = new Batch([]);
+export const noop: Patch<never> = { tag: 'batch', patches: [] };
 
 
 export function applyPatch<T>(value: T, patch: Patch<T>, destructively = false): T {
-  if (patch instanceof KeyPatch) {
+  if (patch.tag === 'key') {
     if (destructively) {
-      // @ts-ignore
-      value[patch._key] = applyPatch(value[patch._key], patch._patch, destructively);
+      value[patch.key] = applyPatch(value[patch.key], patch.patch, destructively);
       return value;
     } else {
-      // @ts-ignore
-      return { ...value, [patch._key]: applyPatch(value[patch._key], patch._patch, destructively) };
+      return { ...value, [patch.key]: applyPatch(value[patch.key], patch.patch, destructively) };
     }
   }
 
-  if (patch instanceof ArraySplice) {
+  if (patch.tag === 'array-splice') {
+    const v = value as any as any[];
     if (destructively) {
-      // @ts-ignore
-      value.splice(patch._index, patch._removes, ...patch._values);
-      return value;
+      v.splice(patch.index, patch.removes, ...patch.inserts);
+      return v as any as T;
     } else {
-      // @ts-ignore
-      const nextValue = value.slice(0); nextValue.splice(patch._index, patch._removes, ...patch._values);
-      return nextValue;
+      const nextValue = v.slice(0); nextValue.splice(patch.index, patch.removes, ...patch.inserts);
+      return nextValue as any as T;
     }
   }
 
-  if (patch instanceof ArraySwap) {
+  if (patch.tag === 'array-swap') {
+    const v = value as any as any[];
     if (destructively) {
-      // @ts-ignore
-      const tmp = value[patch._firstIdx]; value[firstIdx] = value[secondIdx]; value[secondIdx] = tmp;
-      return value;
+      const tmp = v[patch.first]; v[patch.first] = v[patch.second]; v[patch.second] = tmp;
+      return v as any as T;
     } else {
-      // @ts-ignore
-      const nextValue = value.slice(0); nextValue[firstIdx] = value[secondIdx]; nextValue[secondIdx] = value[firstIdx];
-      return nextValue;
+      const nextValue = v.slice(0); nextValue[patch.first] = value[patch.second]; nextValue[patch.second] = value[patch.first];
+      return nextValue as any as T;
     }    
   }
 
-  if (patch instanceof Batch) {
-    return patch._patches.reduce<T>((acc, p) => applyPatch(acc, p, destructively), value);
+  if (patch.tag === 'batch') {
+    return patch.patches.reduce<T>((acc, p) => applyPatch(acc, p, destructively), value);
   }
 
-  if (patch instanceof Replace) {
-    return patch._next;
+  if (patch.tag === 'replace') {
+    return patch.next;
   }
   
   return absurd(patch);
@@ -176,8 +179,8 @@ export class SDOMBase<Model, Action> {
     return new SDOMComap(this as any, coproj);
   }
   
-  dimap<B, C>(coproj: DFunc<B, Model>, proj: (action: Action) => C): SDOM<B, C> {
-    return new SDOMMap(new SDOMComap(this as any, coproj), proj);
+  dimap<B, C>(coproj: DFunc<B, Model>, proj: (action: Action, model: Model) => C): SDOM<B, C> {
+    return new SDOMMap(new SDOMComap(this as any, coproj), proj as any);
   }
 }
 
@@ -261,7 +264,7 @@ export class SDOMCustom<Model, Action> extends SDOMBase<Model, Action> {
 class SDOMMap<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
     readonly _value: SDOM<Model, Action>,
-    readonly _proj: (x: any) => Action,
+    readonly _proj: (x: any, model: Model) => Action,
   ) { super(); }
 }
 
@@ -286,7 +289,7 @@ export class SDOMProp<Model, Action> {
 
 export class SDOMEvent<Model, Action> {
   constructor(
-    readonly _listener: (e: Event, model: Model) => void,
+    readonly _listener: (e: Event, model: Model) => Action|void,
   ) {}  
 }
 
@@ -454,8 +457,8 @@ export function create<Model, Action>(sdom: SDOM<Model, Action>, getModel: () =>
 
 
 export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, Action>, getModel: () => Model, patch: Patch<Model>): HTMLElement|Text {
-  if (patch instanceof Batch) {
-    return patch._patches.reduce((acc, p) => actuate(acc, sdom, getModel, p as any), el);
+  if (patch.tag === 'batch') {
+    return patch.patches.reduce((acc, p) => actuate(acc, sdom, getModel, p as any), el);
   }
   
   if (sdom instanceof SDOMElement) {
@@ -490,11 +493,11 @@ export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, A
   if (sdom instanceof SDOMArray) {
     const array = getModel()[sdom._discriminator] as any[];
     // if (!(patch instanceof ObjectPatch)) throw new Error('actuate2: invalid patch');
-    if (!(patch instanceof KeyPatch) || patch._key !== sdom._discriminator) {
+    if (patch.tag !== 'key' || patch.key !== sdom._discriminator) {
       const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel() });
       array.forEach((item, idx) => {
         const ch = el.childNodes[idx] as HTMLElement;
-        const chPatch = new KeyPatch('model', patch);
+        const chPatch: Patch<any> = { tag: 'key', key: 'model', patch };
         const nextCh = actuate(ch, sdom._item, getChildModel(idx), chPatch);
         if (ch !== nextCh) {
           el.replaceChild(nextCh, ch);
@@ -502,50 +505,54 @@ export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, A
       })
       return el;
     };
-    const p = patch._patch as ArrayPatch<any[]>;
+    const p = patch.patch as Patch<any>;
 
-    if (p instanceof ArraySplice) {
-      for (let i = p._removes - 1; i >= 0; i--) {
-        const ch = el.childNodes[p._index + i];
+    if (p.tag === 'array-splice') {
+      for (let i = p.removes - 1; i >= 0; i--) {
+        const ch = el.childNodes[p.index + i];
         el.removeChild(ch);
       }
       const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel() });
-      p._values.forEach((item, idx) => {
+      p.inserts.forEach((item, idx) => {
         const ch = create(sdom._item, getChildModel(idx));
-        el.insertBefore(ch, el.childNodes[p._index + idx] || null);
+        el.insertBefore(ch, el.childNodes[p.index + idx] || null);
       });
       return el;
     }
     
-    if (p instanceof KeyPatch) {
-      const ch = el.childNodes[p._key] as HTMLElement;
-      const chPatch = new KeyPatch('item', p._patch);
+    if (p.tag === 'key') {
+      const ch = el.childNodes[p.key] as HTMLElement;
+      const chPatch: Patch<any> = { tag: 'key', key: 'item', patch: p.patch };
       const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel() });
-      const nextCh = actuate(ch, sdom._item, getChildModel(p._key), chPatch);
+      const nextCh = actuate(ch, sdom._item, getChildModel(p.key), chPatch);
       if (ch !== nextCh) el.replaceChild(nextCh, ch);
       return el;
     }
 
-    if (p instanceof ArraySwap) {
-      const ch1 = el.childNodes[p._firstIdx];
-      const ch2 = el.childNodes[p._secondIdx];
+    if (p.tag === 'array-swap') {
+      const ch1 = el.childNodes[p.first];
+      const ch2 = el.childNodes[p.second];
       el.removeChild(ch2);
       el.insertBefore(ch2, ch1);
       el.removeChild(ch1);
-      el.insertBefore(ch1, el.childNodes[p._secondIdx] || null);
+      el.insertBefore(ch1, el.childNodes[p.second] || null);
       return el;
     }
 
-    if (p instanceof Replace) {
+    if (p.tag === 'replace') {
       return create(sdom, getModel);
     }
 
+    if (p.tag === 'batch') {
+      throw new Error('[actuate]: unimplemented');
+    }
+    
     return absurd(p);
   }
 
   if (sdom instanceof SDOMPick) {
-    if (patch instanceof KeyPatch) {
-      if (sdom._keys.indexOf(patch._key as keyof Model) === -1) return el;
+    if (patch.tag === 'key') {
+      if (sdom._keys.indexOf(patch.key as keyof Model) === -1) return el;
     }
     return actuate(el, sdom._sdom, getModel, patch);
   }
@@ -610,7 +617,7 @@ function createEventListener<Model, Action>(getModel: () => Model, cb: (e: Event
       }
 
       if (actionInitialized && ('proj' in nodeData)) {
-        action = nodeData.proj(action);
+        action = nodeData.proj(action, getModel());
       }
     }
   };
