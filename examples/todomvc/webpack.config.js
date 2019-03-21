@@ -11,6 +11,9 @@ module.exports = function() {
         test: /\.tsx?$/,
         loader: 'ts-loader',
 //        options: { compilerOptions: tsConfig.compilerOptions, },
+      }, {
+        test: /\.css$/,
+        loaders: ['style-loader', 'css-loader'],
       }]
     },
     resolve: {

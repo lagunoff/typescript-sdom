@@ -1,14 +1,30 @@
 const NODE_DATA = '__SDOM_CUSTOM_DATA__';
 
+
 export type DFunc<A, B> = {
-  (a: A): B;
-  derive(da: Patch<A>, b: B): Patch<B>;
+  proj: (x: A) => B;
+  projPatch: (x: Patch<A>) => Patch<B>;
+};
+
+export function zoom<A, K01 extends keyof A>(k: K01): DFunc<A, A[K01]>;
+export function zoom<A, K01 extends keyof A, K02 extends keyof A[K01]>(k01: K01, k02: K02): DFunc<A, A[K01][K02]>;
+export function zoom<A>(...keys): DFunc<A, any> {
+  return {
+    proj: (a: A) => keys.reduce((acc, k) => acc[k], a),
+    projPatch: (aPatch: Patch<A>) => {
+      let iter: Patch<any> = aPatch;
+      for (const k of keys) {
+        if (iter instanceof KeyPatch && iter._key === k) {
+          iter = iter._patch;
+          continue;
+        }
+        return noop;
+      }
+      return iter;
+    },
+  };
 }
 
-export type DLens<A, B> = {
-  get: DFunc<A, B>;
-  set(x: Patch<B>): Patch<A>;
-}
 
 export type InferPatch1<T>
   = T extends Array<infer A> ? ArrayPatch<A[]>
@@ -74,6 +90,8 @@ export class KeyPatch<A> {
   ) {}
 }
 
+export const noop: Patch<never> = new Batch([]);
+
 
 export function applyPatch<T>(value: T, patch: Patch<T>, destructively = false): T {
   if (patch instanceof KeyPatch) {
@@ -131,6 +149,7 @@ export type SDOM<Model, Action=never> =
   | SDOMPick<Model, Action>
   | SDOMCustom<Model, Action>
   | SDOMMap<Model, Action>
+  | SDOMComap<Model, Action>
   ;
 
 export type RawSDOM<Model, Action> = SDOM<Model, Action>|string|number|((m: Model) => string|number);
@@ -151,6 +170,14 @@ export type SDOMAttribute<Model, Action> =
 export class SDOMBase<Model, Action> {
   map<B>(proj: (action: Action) => B): SDOMMap<Model, B> {
     return new SDOMMap(this as any, proj);
+  }
+  
+  comap<B>(coproj: DFunc<B, Model>): SDOMComap<B, Action> {
+    return new SDOMComap(this as any, coproj);
+  }
+  
+  dimap<B, C>(coproj: DFunc<B, Model>, proj: (action: Action) => C): SDOM<B, C> {
+    return new SDOMMap(new SDOMComap(this as any, coproj), proj);
   }
 }
 
@@ -233,8 +260,15 @@ export class SDOMCustom<Model, Action> extends SDOMBase<Model, Action> {
 
 class SDOMMap<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
-    readonly sdom: SDOM<Model, Action>,
-    readonly proj: (x: any) => Action,
+    readonly _value: SDOM<Model, Action>,
+    readonly _proj: (x: any) => Action,
+  ) { super(); }
+}
+
+class SDOMComap<Model, Action> extends SDOMBase<Model, Action> {
+  constructor(
+    readonly _value: SDOM<any, Action>,
+    readonly _coproj: DFunc<Model, any>,
   ) { super(); }
 }
 
@@ -311,6 +345,9 @@ export namespace h {
   export const tbody = h.bind(void 0, 'tbody') as BoundH;
   export const thead = h.bind(void 0, 'thead') as BoundH;
   export const th = h.bind(void 0, 'th') as BoundH;
+  export const section = h.bind(void 0, 'section') as BoundH;
+  export const header = h.bind(void 0, 'header') as BoundH;
+  export const footer = h.bind(void 0, 'footer') as BoundH;
 }
 
 
@@ -401,8 +438,14 @@ export function create<Model, Action>(sdom: SDOM<Model, Action>, getModel: () =>
   }
   
   if (sdom instanceof SDOMMap) {
-    const el = create(sdom.sdom, getModel);
-    el[NODE_DATA] = { proj: sdom.proj };
+    const el = create(sdom._value, getModel);
+    el[NODE_DATA] = { proj: sdom._proj };
+    return el;
+  }
+  
+  if (sdom instanceof SDOMComap) {
+    const _getModel = () => sdom._coproj.proj(getModel());
+    const el = create(sdom._value, _getModel);
     return el;
   }
   
@@ -512,22 +555,21 @@ export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, A
   }
 
   if (sdom instanceof SDOMMap) {
-    const nextEl = actuate(el, sdom.sdom, getModel, patch);
+    const nextEl = actuate(el, sdom._value, getModel, patch);
     if (nextEl !== el) {
-      nextEl[NODE_DATA] = { proj: sdom.proj, getModel };
-    } else if (isReplace(patch)) {
-      nextEl[NODE_DATA].model = applyPatch(nextEl[NODE_DATA].model, patch, true);
+      nextEl[NODE_DATA] = { proj: sdom._proj };
     }
 
     return nextEl;
   }
+  
+  if (sdom instanceof SDOMComap) {
+    const _getModel = () => sdom._coproj.proj(getModel());
+    const nextEl = actuate(el, sdom._value, _getModel, sdom._coproj.projPatch(patch));
+    return nextEl;
+  }
+  
   return absurd(sdom);
-}
-
-function isReplace(patch: Patch<any>): boolean {
-  if (patch instanceof Replace) return true;
-  if (patch instanceof Batch) return patch._patches.reduce((acc, p) => acc || isReplace(p), false);
-  return false;
 }
 
 

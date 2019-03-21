@@ -7,6 +7,11 @@ export type Model = {
   editing: string|null;
 };
 
+// Init
+export function init(title: string): Model {
+  return { title, completed: false, editing: null };
+}
+
 // Action
 export type Action =
   | { tag: 'Completed' }

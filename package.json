@@ -2,5 +2,8 @@
   "name": "typescript-sdom",
   "version": "0.0.1",
   "main": "index.js",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "ts-loader": "^5.3.3"
+  }
 }
