@@ -7,11 +7,6 @@ export type Model = {
   editing: string|null;
 };
 
-// Props
-export type Props = {
-  dispatch(action: Action): void;
-};
-
 // Action
 export type Action =
   | { tag: 'Completed' }
@@ -34,22 +29,18 @@ export function update(action: Action): Patch<Model> {
 }
 
 // View
-export function view(props: Props): SDOM<Model> {
-  const { dispatch } = props;
-  
-  return h.li({ class: (m: Model) => m.completed ? 'completed' : '' }).childs(
-    h.div({ class: 'view' }).childs(
-      h.input({ class: 'toggle', type: 'checkbox' }).props({ checked: (m: Model) => m.completed }).on({
-        check: e => dispatch({ tag: 'Completed' }),
-      }),
-      h.label((m: Model) => m.title),
-      h.button({ class: 'destroy '}).on({
-        click: () => dispatch({ tag: 'Destroy' }),
-      }),
-    ),
-    h.input({ class: 'edit' }).props({ value: (m: Model) => m.editing || m.title }).on({
-      input: e => dispatch({ tag: 'Editing/input', value: e['target']!['value'] }),
-      blur: () => dispatch({ tag: 'Editing/commit'}),
+export const view: SDOM<Model, Action> = h.li({ class: (m: Model) => m.completed ? 'completed' : '' }).childs(
+  h.div({ class: 'view' }).childs(
+    h.input({ class: 'toggle', type: 'checkbox' }).props({ checked: (m: Model) => m.completed }).on({
+      check: e => ({ tag: 'Completed' }),
     }),
-  );
-}
+    h.label((m: Model) => m.title),
+    h.button({ class: 'destroy '}).on({
+      click: () => ({ tag: 'Destroy' }),
+    }),
+  ),
+  h.input({ class: 'edit' }).props({ value: (m: Model) => m.editing || m.title }).on({
+    input: e => ({ tag: 'Editing/input', value: e['target']!['value'] }),
+    blur: () => ({ tag: 'Editing/commit'}),
+  }),
+);

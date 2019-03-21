@@ -123,33 +123,45 @@ export function applyPatch<T>(value: T, patch: Patch<T>, destructively = false):
 }
 
 
-export type SDOM<Model> =
-  | string|number|((m: Model) => string)
-  | SDOMElement<Model>
-  | SDOMText<Model>
-  | SDOMTextThunk<Model>
-  | SDOMDiscriminate<Model>
-  | SDOMArray<Model>
-  | SDOMPick<Model>
-  | SDOMCustom<Model>
-  | HasSDOM<Model>
+export type SDOM<Model, Action=never> =
+  | SDOMElement<Model, Action>
+  | SDOMText<Model, Action>
+  | SDOMDiscriminate<Model, Action>
+  | SDOMArray<Model, Action>
+  | SDOMPick<Model, Action>
+  | SDOMCustom<Model, Action>
+  | SDOMMap<Model, Action>
   ;
 
+export type RawSDOM<Model, Action> = SDOM<Model, Action>|string|number|((m: Model) => string|number);
 
-export type SDOMAttribute<Model> =
-  | SDOMAttr<Model>
-  | SDOMProp<Model>
-  | SDOMEvent<Model>
+export function prepareSDOM<Model, Action>(raw: RawSDOM<Model, Action>): SDOM<Model, Action> {
+  if (raw instanceof SDOMBase) return raw;
+  return new SDOMText(raw);
+}
+
+
+export type SDOMAttribute<Model, Action> =
+  | SDOMAttr<Model, Action>
+  | SDOMProp<Model, Action>
+  | SDOMEvent<Model, Action>
 ;
 
-export class SDOMElement<Model> {
+// Base class is needed for instance method in `SDOM`
+export class SDOMBase<Model, Action> {
+  map<B>(proj: (action: Action) => B): SDOMMap<Model, B> {
+    return new SDOMMap(this as any, proj);
+  }
+}
+
+export class SDOMElement<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
     public _name: string,
-    public _attributes: Record<string, SDOMAttribute<Model>>,
-    public _childs: SDOM<Model>[],
-  ) {}
+    public _attributes: Record<string, SDOMAttribute<Model, Action>>,
+    public _childs: SDOM<Model, Action>[],
+  ) { super(); }
 
-  attrs(attrs: Record<string, RawAttribute<Model>>) {
+  attrs(attrs: Record<string, RawAttribute<Model, Action>>) {
     for (const k in attrs) {
       if (!isAttribute(attrs[k])) attrs[k] = new SDOMAttr(attrs[k] as any);
     }
@@ -157,7 +169,7 @@ export class SDOMElement<Model> {
     return this;
   }
   
-  props(attrs: Record<string, RawAttribute<Model>>) {
+  props(attrs: Record<string, RawAttribute<Model, Action>>) {
     for (const k in attrs) {
       if (!isAttribute(attrs[k])) attrs[k] = new SDOMProp(attrs[k] as any);
     }
@@ -165,7 +177,7 @@ export class SDOMElement<Model> {
     return this;
   }
   
-  on(attrs: Record<string, Listener<Model>>) {
+  on(attrs: Record<string, Listener<Model, Action>>) {
     for (const k in attrs) {
       attrs[k] = new SDOMEvent(attrs[k] as any) as any;
     }
@@ -173,98 +185,97 @@ export class SDOMElement<Model> {
     return this;
   }
   
-  childs(...childs: SDOM<Model>[]) {
+  childs(...childs: SDOM<Model, Action>[]) {
     this._childs = childs;
     return this;
   }
 }
 
-export type Listener<Model> = (e: Event, model: Model) => void;
+export type Listener<Model, Action> = (e: Event, model: Model) => Action|void;
 
-export class SDOMText<Model> {
+
+
+export class SDOMText<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
-    readonly _value: string,
-  ) {}
+    readonly _value: string|number|((m: Model) => string|number),
+  ) { super(); }
 }
 
-export class SDOMTextThunk<Model> {
-  constructor(
-    readonly _thunk: (model: Model) => string,
-  ) {}
-}
-
-export class SDOMDiscriminate<Model> {
+export class SDOMDiscriminate<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
     readonly _discriminator: string[],
-    readonly _tags: Record<string, SDOM<Model>>,
-  ) {}
+    readonly _tags: Record<string, SDOM<Model, Action>>,
+  ) { super(); }
 }
 
-export class SDOMArray<Model> {
+export class SDOMArray<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
     readonly _discriminator: string,
-    readonly _item: SDOM<any>,
+    readonly _item: SDOM<any, any>,
     readonly _name: string,
-    readonly _attributes: Record<string, SDOMAttribute<Model>>,
-  ) {}
+    readonly _attributes: Record<string, SDOMAttribute<Model, Action>>,
+  ) { super(); }
 }
 
-export class SDOMPick<Model, K extends (keyof Model)[] = (keyof Model)[]> {
+export class SDOMPick<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
-    readonly _keys: K,
-    readonly _sdom: SDOM<Pick<Model, K[number]>>,
-  ) {}
+    readonly _keys: Array<string|number|symbol>,
+    readonly _sdom: SDOM<Partial<Model>, Action>,
+  ) { super(); }
 }
 
-export class SDOMCustom<Model > {
+export class SDOMCustom<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
     readonly _create: (getModel: () => Model) => HTMLElement|Text,
     readonly _actuate: (el: HTMLElement|Text, getModel: () => Model, patch: Patch<Model>) => HTMLElement|Text,
-  ) {}
+  ) { super(); }
 }
 
-export abstract class HasSDOM<Model > {
-  abstract toSDOM(): SDOM<Model>;
+class SDOMMap<Model, Action> extends SDOMBase<Model, Action> {
+  constructor(
+    readonly sdom: SDOM<Model, Action>,
+    readonly proj: (x: any) => Action,
+  ) { super(); }
 }
 
-export class SDOMAttr<Model> {
+export class SDOMAttr<Model, Action> {
   constructor(
     readonly _value: string|number|boolean|((model: Model) => string|number|boolean),
   ) {}
 }
 
-export class SDOMProp<Model> {
+export class SDOMProp<Model, Action> {
   constructor(
     readonly _value: unknown|((model: Model) => unknown),
   ) {}
 }
 
-export class SDOMEvent<Model> {
+export class SDOMEvent<Model, Action> {
   constructor(
     readonly _listener: (e: Event, model: Model) => void,
   ) {}  
 }
 
 
-function isAttribute(attr: unknown): attr is SDOMAttribute<any> {
+function isAttribute(attr: unknown): attr is SDOMAttribute<any, any> {
   return attr instanceof SDOMAttr || attr instanceof SDOMProp || attr instanceof SDOMEvent;
 }
 
 
 export type Many<T> = T|T[];
-export type RawAttribute<Model> = SDOMAttribute<Model>|string|number|boolean|((model: Model) => string|number|boolean);
+export type RawAttribute<Model, Action> = SDOMAttribute<Model, Action>|string|number|boolean|((model: Model) => string|number|boolean);
 
 
-export function h<Model>(name: string, attrs: Record<string, RawAttribute<Model>>, ...childs: SDOM<Model>[]): SDOMElement<Model>;
-export function h<Model>(name: string, ...childs: SDOM<Model>[]): SDOMElement<Model>;
-export function h<Model>() {
+export function h<Model, Action=never>(name: string, attrs: Record<string, RawAttribute<Model, Action>>, ...childs: RawSDOM<Model, Action>[]): SDOMElement<Model, Action>;
+export function h<Model, Action=never>(name: string, ...childs: RawSDOM<Model, Action>[]): SDOMElement<Model, Action>;
+export function h<Model, Action=never>() {
   // @ts-ignore
   const [name, attrs, childs]
     = arguments.length === 1 ? [arguments[0], {}, []]
     : (arguments[1] && arguments[1].constructor === Object) ? [arguments[0], arguments[1], Array.prototype.slice.call(arguments, 2)]
     : [arguments[0], {}, Array.prototype.slice.call(arguments, 1)];
   
-  return new SDOMElement<Model>(name, prepareAttrs(name, attrs), Array.isArray(childs) ? childs : [childs])
+  return new SDOMElement<Model, Action>(name, prepareAttrs(name, attrs), (Array.isArray(childs) ? childs.map(prepareSDOM) : [prepareSDOM(childs)]) as any)
 
   function prepareAttrs(name: string, attrs) {
     for (const k in attrs) {
@@ -277,8 +288,8 @@ export function h<Model>() {
 
 export namespace h {
   export type BoundH = {
-      <Model>(...childs: SDOM<Model>[]): SDOMElement<Model>;
-      <Model>(attrs: Record<string, RawAttribute<Model>>, ...childs: SDOM<Model>[]): SDOMElement<Model>;
+      <Model, Action=never>(...childs: RawSDOM<Model, Action>[]): SDOMElement<Model, Action>;
+      <Model, Action=never>(attrs: Record<string, RawAttribute<Model, Action>>, ...childs: RawSDOM<Model, Action>[]): SDOMElement<Model, Action>;
   };
   
   export const div = h.bind(void 0, 'div') as BoundH;
@@ -288,8 +299,8 @@ export namespace h {
   export const h1 = h.bind(void 0, 'h1') as BoundH;
   export const h2 = h.bind(void 0, 'h2') as BoundH;
   export const h3 = h.bind(void 0, 'h3') as BoundH;
-  export const input = <Model>(attrs: Record<string, RawAttribute<Model>>) => h('input', attrs);
-  export const img = <Model>(attrs: Record<string, RawAttribute<Model>>) => h('img', attrs);
+  export const input = <Model, Action=never>(attrs: Record<string, RawAttribute<Model, Action>>) => h('input', attrs);
+  export const img = <Model, Action=never>(attrs: Record<string, RawAttribute<Model, Action>>) => h('img', attrs);
   export const label = h.bind(void 0, 'label') as BoundH;
   export const ul = h.bind(void 0, 'ul') as BoundH;
   export const li = h.bind(void 0, 'li') as BoundH;
@@ -303,58 +314,25 @@ export namespace h {
 }
 
 
-export namespace th {
-  export type BoundH = {
-      <Model>(template: TemplateStringsArray, ...args): SDOMElement<Model>;
-  };
-  
-  export const div = h.bind(void 0, 'div') as BoundH;
-  export const span = h.bind(void 0, 'span') as BoundH;
-  export const button = h.bind(void 0, 'button') as BoundH;
-  export const p = h.bind(void 0, 'p') as BoundH;
-  export const h1 = h.bind(void 0, 'h1') as BoundH;
-  export const h2 = h.bind(void 0, 'h2') as BoundH;
-  export const h3 = h.bind(void 0, 'h3') as BoundH;
-  export const input = <Model>(attrs: Record<string, SDOMAttribute<Model>>) => h('input', attrs);
-  export const img = <Model>(attrs: Record<string, SDOMAttribute<Model>>) => h('img', attrs);
-  export const label = h.bind(void 0, 'label') as BoundH;
-  export const ul = h.bind(void 0, 'ul') as BoundH;
-  export const li = h.bind(void 0, 'li') as BoundH;
-  export const a = h.bind(void 0, 'a') as BoundH;
-  export const table = h.bind(void 0, 'table') as BoundH;
-  export const tbody = h.bind(void 0, 'tbody') as BoundH;
-  export const thead = h.bind(void 0, 'thead') as BoundH;
-  export const th = h.bind(void 0, 'th') as BoundH;
+export function text(value: string): SDOMText<{}, never> {
+  return new SDOMText(value);
 }
 
 
-export function text(value: string) {
-  return new SDOMText<{}>(value);
-}
-
-export function thunk<Model>(th: (model: Model) => string) {
-  return new SDOMTextThunk<Model>(th);
-}
-
-export function pick<Model, K extends (keyof Model)[]>(keys: K, sdom: SDOM<Pick<Model, K[number]>>) {
-  return new SDOMPick<Model, K>(keys, sdom);
-}
-
-
-export function discriminate<Model>(discriminator: keyof Model);
+export function discriminate<Model, Action>(discriminator: keyof Model);
 export function discriminate<Model, K extends keyof Model>(k1: K, k2: keyof Model[K]);
-export function discriminate<Model>(...discriminators) {
-  return <T extends Record<string, SDOM<Model>>>(tags: T) => new SDOMDiscriminate<Model>(discriminators, tags);
+export function discriminate<Model, Action>(...discriminators) {
+  return <T extends Record<string, SDOM<Model, Action>>>(tags: T) => new SDOMDiscriminate<Model, Action>(discriminators, tags);
 }
 
 // @ts-ignore
 type TK<M, K> = M[K][number];
 
 
-export function array<Model, K extends keyof Model>(discriminator: K, child: SDOM<{ item: TK<Model, K>, model: Model }>);
-export function array<Model, K extends keyof Model>(discriminator: K, name: string, child: SDOM<{ item: TK<Model, K>, model: Model }>);
-export function array<Model, K extends keyof Model>(discriminator: K, name: string, attributes: Record<string, SDOMAttribute<Model>>, child: SDOM<{ item: TK<Model, K>, model: Model }>);
-export function array<Model, K extends keyof Model>() {
+export function array<Model, Action, K extends keyof Model>(discriminator: K, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>);
+export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>);
+export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, attributes: Record<string, SDOMAttribute<Model, Action>>, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>);
+export function array<Model, Action, K extends keyof Model>() {
   // @ts-ignore
   const [discriminator, name, attributes, child]
     = arguments.length === 2 ? [arguments[0], 'div', {}, arguments[1]]
@@ -362,24 +340,24 @@ export function array<Model, K extends keyof Model>() {
     : arguments
   ;
   
-  return new SDOMPick<Model, K[]>([discriminator], new SDOMArray<Model>(discriminator, child, name, attributes));
+  return new SDOMPick<Model, Action>([discriminator], new SDOMArray<Model, Action>(discriminator, child, name, attributes));
 }
 
 
-export function attr<Model>(value: string|number|boolean|((model: Model) => string|number|boolean)): SDOMAttr<Model> {
+export function attr<Model, Action>(value: string|number|boolean|((model: Model) => string|number|boolean)): SDOMAttr<Model, Action> {
   return new SDOMAttr(value);
 }
 
-export function prop<Model>(value: string|number|boolean|((model: Model) => string|number|boolean)): SDOMProp<Model> {
+export function prop<Model, Action>(value: string|number|boolean|((model: Model) => string|number|boolean)): SDOMProp<Model, Action> {
   return new SDOMProp(value);
 }
 
-export function event<Model>(listener: (e: Event, model: Model) => void): SDOMEvent<Model> {
+export function event<Model, Action>(listener: (e: Event, model: Model) => void): SDOMEvent<Model, Action> {
   return new SDOMEvent(listener);
 }
 
 
-export function create<Model>(sdom: SDOM<Model>, getModel: () => Model): HTMLElement|Text {
+export function create<Model, Action>(sdom: SDOM<Model, Action>, getModel: () => Model): HTMLElement|Text {
   if (sdom instanceof SDOMElement) {
     const el = document.createElement(sdom._name);
     Object.keys(sdom._attributes).forEach(k => applyAttribute(k, sdom._attributes[k], el, getModel));
@@ -388,20 +366,11 @@ export function create<Model>(sdom: SDOM<Model>, getModel: () => Model): HTMLEle
   }
   
   if (sdom instanceof SDOMText) {
-    const el = document.createTextNode(sdom._value);
+    const text = typeof (sdom._value) === 'function' ? sdom._value(getModel()) : sdom._value;
+    const el = document.createTextNode(String(text));
     return el;
   }
-  
-  if (sdom instanceof SDOMTextThunk) {
-    const el = document.createTextNode(sdom._thunk(getModel()));
-    return el;
-  }
-  
-  if (typeof (sdom) === 'function') {
-    const el = document.createTextNode(sdom(getModel()));
-    return el;
-  }
-  
+    
   if (sdom instanceof SDOMDiscriminate) {
     const ch = sdom._tags[sdom._discriminator.reduce((acc, k) => acc[k], getModel())];
     const el = create(ch, getModel);
@@ -430,18 +399,18 @@ export function create<Model>(sdom: SDOM<Model>, getModel: () => Model): HTMLEle
   if (sdom instanceof SDOMCustom) {
     return sdom._create(getModel);
   }
-
-  if (sdom instanceof HasSDOM) {
-    return create(sdom.toSDOM(), getModel);
+  
+  if (sdom instanceof SDOMMap) {
+    const el = create(sdom.sdom, getModel);
+    el[NODE_DATA] = { proj: sdom.proj };
+    return el;
   }
-
-  ensure<string|number>(sdom);
-  const el = document.createTextNode(sdom + '');
-  return el;
+  
+  return absurd(sdom);
 }
 
 
-export function actuate<Model>(el: HTMLElement|Text, sdom: SDOM<Model>, getModel: () => Model, patch: Patch<Model>): HTMLElement|Text {
+export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, Action>, getModel: () => Model, patch: Patch<Model>): HTMLElement|Text {
   if (patch instanceof Batch) {
     return patch._patches.reduce((acc, p) => actuate(acc, sdom, getModel, p as any), el);
   }
@@ -456,22 +425,14 @@ export function actuate<Model>(el: HTMLElement|Text, sdom: SDOM<Model>, getModel
     });
     return el;
   }
-  
-  if (sdom instanceof SDOMTextThunk) {
-    if (!(el instanceof Text)) throw new Error('actuate: got invalid DOM node');
-    const next = sdom._thunk(getModel());
-    if (el.nodeValue !== next) el.nodeValue = next;
-    return el;
-  }
-  
-  if (typeof (sdom) === 'function') {
-    if (!(el instanceof Text)) throw new Error('actuate: got invalid DOM node');
-    const next = sdom(getModel());
-    if (el.nodeValue !== next) el.nodeValue = next;
-    return el;
-  }
-
+    
   if (sdom instanceof SDOMText) {
+    if (typeof (sdom._value) === 'function') {
+      if (!(el instanceof Text)) throw new Error('actuate: got invalid DOM node');
+      const next = sdom._value(getModel());
+      if (el.nodeValue !== next) el.nodeValue = String(next);
+      return el;
+    }
     return el;
   }
 
@@ -549,15 +510,19 @@ export function actuate<Model>(el: HTMLElement|Text, sdom: SDOM<Model>, getModel
   if (sdom instanceof SDOMCustom) {
     return sdom._actuate(el, getModel, patch);
   }
-  
-  if (sdom instanceof HasSDOM) {
-    return create(sdom.toSDOM(), getModel);
+
+  if (sdom instanceof SDOMMap) {
+    const nextEl = actuate(el, sdom.sdom, getModel, patch);
+    if (nextEl !== el) {
+      nextEl[NODE_DATA] = { proj: sdom.proj, getModel };
+    } else if (isReplace(patch)) {
+      nextEl[NODE_DATA].model = applyPatch(nextEl[NODE_DATA].model, patch, true);
+    }
+
+    return nextEl;
   }
-
-  ensure<string|number>(sdom);
-  return el;
+  return absurd(sdom);
 }
-
 
 function isReplace(patch: Patch<any>): boolean {
   if (patch instanceof Replace) return true;
@@ -566,7 +531,7 @@ function isReplace(patch: Patch<any>): boolean {
 }
 
 
-function applyAttribute<Model>(name: string, sdomAttr: SDOMAttribute<Model>, el: HTMLElement, getModel: () => Model, patch?: Patch<Model>) {
+function applyAttribute<Model, Action>(name: string, sdomAttr: SDOMAttribute<Model, Action>, el: HTMLElement, getModel: () => Model, patch?: Patch<Model>) {
   if (sdomAttr instanceof SDOMAttr) {
     const next = typeof(sdomAttr._value) === 'function' ? sdomAttr._value(getModel()) : sdomAttr._value;
     if (!patch || (el.getAttribute(name) !== next)) el.setAttribute(name, String(next));
@@ -587,9 +552,25 @@ function applyAttribute<Model>(name: string, sdomAttr: SDOMAttribute<Model>, el:
 }
 
 
-function createEventListener<Model>(getModel: () => Model, cb: (e: Event, model: Model) => void): EventListener {
+function createEventListener<Model, Action>(getModel: () => Model, cb: (e: Event, model: Model) => Action|void): EventListener {
   return e => {
-    cb(e, getModel());
+    let iter = e.target as HTMLElement|null;
+    let action = void 0 as Action|void;
+    let actionInitialized = false;
+    
+    for (; iter; iter = iter.parentElement) {
+      const nodeData = iter[NODE_DATA];
+      if (!nodeData) continue;
+      if (!actionInitialized) {
+        action = cb(e, getModel());
+        actionInitialized = true;
+        if (action === void 0) return;
+      }
+
+      if (actionInitialized && ('proj' in nodeData)) {
+        action = nodeData.proj(action);
+      }
+    }
   };
 }
 
