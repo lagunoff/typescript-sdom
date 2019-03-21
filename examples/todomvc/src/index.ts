@@ -1,4 +1,4 @@
-import { h, Patch, array, create, zoom, actuate, applyPatch, noop, RawPatch, preparePatch } from '../../../src';
+import { h, Patch, array, create, zoom, actuate, applyPatch, noop, RawPatch, preparePatch, nodeIndex } from '../../../src';
 import * as todo from './todo';
 import '../node_modules/todomvc-app-css/index.css';
 
@@ -20,24 +20,27 @@ export type Action =
   | { tag: 'ClearCompleted' }
   | { tag: 'KeyDown', event: KeyboardEvent }
   | { tag: 'HashChange', hash: string }
-  | { tag: '@Todo', key: number, action: todo.Action }
+  | { tag: '@Todo', idx: number, action: todo.Action }
 
 // Update
 export function update(action: Action, model: Model): RawPatch<Model> {
   switch (action.tag) {
-    case 'Edit': return { $at: 'title', patch: { $replace: action.value } };
+    case 'Edit': return { $patch: { title: action.value } };
     case 'Filter/set': return [];
     case 'ToggleAll': return [];
     case 'ClearCompleted': return [];
     case 'KeyDown': {
-      if (action.event.code === 'Enter' && model.title) return [
+      if (action.event.keyCode === KEY_ENTER && model.title) return [
         { $patch: { title: '' } },
         { $at: 'todos', patch: { $push: todo.init(model.title) } },
       ];
       return [];
     }
     case 'HashChange': return [];
-    case '@Todo': return [];
+    case '@Todo': {
+      if (action.action.tag === 'Destroy') return { $at: 'todos', patch: { $remove: action.idx } };
+      return { $at: ['todos', action.idx], patch: todo.update(action.action, model.todos[action.idx]) };
+    };
   }
 }
 
@@ -56,7 +59,7 @@ export const view = h.div<Model, Action>(
       h.input({ id: 'toggle-all', class: 'toggle-all', type: 'checkbox' }),
       h.label('Mark all as complete').attrs({ for: 'toggle-all' }),
       h.ul({ class: 'todo-list' }).childs(
-        array<Model, Action, 'todos'>('todos', todo.view.dimap(zoom('item'), (action, model) => ({ tag: '@Todo', action, title: model.title }))),
+        array<Model, Action, 'todos'>('todos', todo.view.dimap(zoom('item'), (action, model, el) => ({ tag: '@Todo', action, idx: nodeIndex(el) } as Action))),
       ),
       h.footer({ class: 'footer' }).childs(
         h.span({ class: 'todo-count'}).childs(h('string', (m: Model) => m.todos.length)),
@@ -79,14 +82,17 @@ export const view = h.div<Model, Action>(
 );
 
 
-let model: Model = { filter: 'all', todos: [], title: 'sdfsd' };
+let model: Model = { filter: 'all', todos: [], title: '' };
 const container = document.createElement('div');
 document.body.appendChild(container);
+const getModel = () => model;
 const sdom = view.map((action) => {
   console.log('action', action);
   const patch = preparePatch(model, update(action, model));
   model = applyPatch(model, patch);
   actuate(el, sdom, () => model, patch);
 })
-const el = create(sdom, () => model);
+const el = create(sdom, getModel);
 container.appendChild(el);
+
+const KEY_ENTER = 13;

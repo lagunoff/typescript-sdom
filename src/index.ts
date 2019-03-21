@@ -42,6 +42,7 @@ export type RawPatchSimple<T> =
   | { $at: Many<string|number>, patch: RawPatch<any> }
   | { $splice: { index: number, removes: number, inserts: T[] } }
   | { $swap: { first: number, second: number } }
+  | { $remove: number }
   | { $push: Many<T> }
   | { $unshift: Many<T> }
   | { $replace: T }
@@ -73,7 +74,7 @@ export function preparePatch<T>(value: T, patch: RawPatch<T>): Patch<T> {
   if ('$push' in patch) {
     const v = value as any as any[];
     const inserts = Array.isArray(patch.$push) ? patch.$push : [patch.$push];
-    const index = v.length - 1;
+    const index = v.length;
     return { tag: 'array-splice', index, removes: 0, inserts };
   }
   
@@ -94,6 +95,10 @@ export function preparePatch<T>(value: T, patch: RawPatch<T>): Patch<T> {
     return { tag: 'batch', patches: Object.keys(patch.$patch).map<Patch<any>>(key => ({ tag: 'key', key, patch: { tag: 'replace', prev: value[key], next: patch.$patch[key] } })) };
   }
   
+  if ('$remove' in patch) {
+    return { tag: 'array-splice', index: patch.$remove, removes: 1, inserts: [] };
+  }
+  
   return absurd(patch);
 }
 
@@ -106,6 +111,11 @@ export function applyPatch<T>(value: T, patch: Patch<T>, destructively = false):
       value[patch.key] = applyPatch(value[patch.key], patch.patch, destructively);
       return value;
     } else {
+      if (Array.isArray(value)) {
+        const output = value.slice();
+        output.splice(patch.key as number, 1, applyPatch(value[patch.key], patch.patch, destructively));
+        return output as any;
+      }
       return { ...value, [patch.key]: applyPatch(value[patch.key], patch.patch, destructively) };
     }
   }
@@ -179,7 +189,7 @@ export class SDOMBase<Model, Action> {
     return new SDOMComap(this as any, coproj);
   }
   
-  dimap<B, C>(coproj: DFunc<B, Model>, proj: (action: Action, model: Model) => C): SDOM<B, C> {
+  dimap<B, C>(coproj: DFunc<B, Model>, proj: (action: Action, model: B, el: HTMLElement) => C): SDOM<B, C> {
     return new SDOMMap(new SDOMComap(this as any, coproj), proj as any);
   }
 }
@@ -220,6 +230,15 @@ export class SDOMElement<Model, Action> extends SDOMBase<Model, Action> {
     return this;
   }
 }
+
+export function nodeIndex(el: HTMLElement) {
+  let iter: Node|null = el;
+  let i = 0;
+  while( (iter = iter.previousSibling) != null ) 
+    i++;
+  return i;
+}
+
 
 export type Listener<Model, Action> = (e: Event, model: Model) => Action|void;
 
@@ -369,10 +388,10 @@ export function discriminate<Model, Action>(...discriminators) {
 type TK<M, K> = M[K][number];
 
 
-export function array<Model, Action, K extends keyof Model>(discriminator: K, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>);
-export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>);
-export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, attributes: Record<string, SDOMAttribute<Model, Action>>, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>);
-export function array<Model, Action, K extends keyof Model>() {
+export function array<Model, Action, K extends keyof Model>(discriminator: K, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>): SDOM<Model, Action>;
+export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>): SDOM<Model, Action>;
+export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, attributes: Record<string, SDOMAttribute<Model, Action>>, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>): SDOM<Model, Action>;
+export function array<Model, Action, K extends keyof Model>(): SDOM<Model, Action> {
   // @ts-ignore
   const [discriminator, name, attributes, child]
     = arguments.length === 2 ? [arguments[0], 'div', {}, arguments[1]]
@@ -442,7 +461,7 @@ export function create<Model, Action>(sdom: SDOM<Model, Action>, getModel: () =>
   
   if (sdom instanceof SDOMMap) {
     const el = create(sdom._value, getModel);
-    el[NODE_DATA] = { proj: sdom._proj };
+    el[NODE_DATA] = { proj: sdom._proj, getModel };
     return el;
   }
   
@@ -494,7 +513,7 @@ export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, A
     const array = getModel()[sdom._discriminator] as any[];
     // if (!(patch instanceof ObjectPatch)) throw new Error('actuate2: invalid patch');
     if (patch.tag !== 'key' || patch.key !== sdom._discriminator) {
-      const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel() });
+      const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel(), idx });
       array.forEach((item, idx) => {
         const ch = el.childNodes[idx] as HTMLElement;
         const chPatch: Patch<any> = { tag: 'key', key: 'model', patch };
@@ -512,9 +531,9 @@ export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, A
         const ch = el.childNodes[p.index + i];
         el.removeChild(ch);
       }
-      const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel() });
+      const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel(), idx });
       p.inserts.forEach((item, idx) => {
-        const ch = create(sdom._item, getChildModel(idx));
+        const ch = create(sdom._item, getChildModel(p.index + idx));
         el.insertBefore(ch, el.childNodes[p.index + idx] || null);
       });
       return el;
@@ -523,7 +542,7 @@ export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, A
     if (p.tag === 'key') {
       const ch = el.childNodes[p.key] as HTMLElement;
       const chPatch: Patch<any> = { tag: 'key', key: 'item', patch: p.patch };
-      const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel() });
+      const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel(), idx });
       const nextCh = actuate(ch, sdom._item, getChildModel(p.key), chPatch);
       if (ch !== nextCh) el.replaceChild(nextCh, ch);
       return el;
@@ -564,7 +583,7 @@ export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, A
   if (sdom instanceof SDOMMap) {
     const nextEl = actuate(el, sdom._value, getModel, patch);
     if (nextEl !== el) {
-      nextEl[NODE_DATA] = { proj: sdom._proj };
+      nextEl[NODE_DATA] = { proj: sdom._proj, getModel };
     }
 
     return nextEl;
@@ -610,6 +629,7 @@ function createEventListener<Model, Action>(getModel: () => Model, cb: (e: Event
     for (; iter; iter = iter.parentElement) {
       const nodeData = iter[NODE_DATA];
       if (!nodeData) continue;
+      if ('getModel' in nodeData) getModel = nodeData.getModel;
       if (!actionInitialized) {
         action = cb(e, getModel());
         actionInitialized = true;
@@ -617,7 +637,7 @@ function createEventListener<Model, Action>(getModel: () => Model, cb: (e: Event
       }
 
       if (actionInitialized && ('proj' in nodeData)) {
-        action = nodeData.proj(action, getModel());
+        action = nodeData.proj(action, getModel(), iter);
       }
     }
   };
