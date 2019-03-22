@@ -59,10 +59,13 @@ export const view = h.div<Model, Action>(
       h.input({ id: 'toggle-all', class: 'toggle-all', type: 'checkbox' }),
       h.label('Mark all as complete').attrs({ for: 'toggle-all' }),
       h.ul({ class: 'todo-list' }).childs(
-        array<Model, Action, 'todos'>('todos', todo.view.dimap(zoom('item'), (action, model, el) => ({ tag: '@Todo', action, idx: nodeIndex(el) } as Action))),
+        array<Model, Action, 'todos'>(
+          'todos',
+          todo.view.dimap(zoom('item'), (action, model, el) => ({ tag: '@Todo', action, idx: nodeIndex(el) } as Action))
+        ),
       ),
       h.footer({ class: 'footer' }).childs(
-        h.span({ class: 'todo-count'}).childs(h('string', (m: Model) => m.todos.length)),
+        h.span({ class: 'todo-count'}).childs(h('strong', (m: Model) => m.todos.length)),
         h.ul({ class: 'filters' }).childs(
           h.li(h.a('All').attrs({ href: '#/', class: (m: Model) => m.filter === 'all' ? 'selected' : '' })),
           h.li(h.a('Active').attrs({ href: '#/active', class: (m: Model) => m.filter === 'active' ? 'selected' : '' })),
@@ -89,6 +92,7 @@ const getModel = () => model;
 const sdom = view.map((action) => {
   console.log('action', action);
   const patch = preparePatch(model, update(action, model));
+  console.log('patch', patch);
   model = applyPatch(model, patch);
   actuate(el, sdom, () => model, patch);
 })

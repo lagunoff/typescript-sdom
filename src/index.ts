@@ -28,8 +28,9 @@ export function zoom<A>(...keys): DFunc<A, any> {
 
 export type Patch<T> =
   | { tag: 'replace', prev: T, next: T }
-  | { tag: 'array-splice', index: number, removes: number, inserts: T[] }
-  | { tag: 'array-swap', first: number, second: number }
+  | { tag: 'array-splice', index: number, remove: T, insert: T }
+  // @ts-ignore
+  | { tag: 'array-swap', first: T[number], firstIdx: number, second: T[number], secondIdx: number }
   | { tag: 'key', key: string|number, patch: Patch<any> }
   | { tag: 'batch', patches: Patch<T>[] }
 ;
@@ -40,11 +41,11 @@ export type RawPatch<T> =
 
 export type RawPatchSimple<T> =
   | { $at: Many<string|number>, patch: RawPatch<any> }
-  | { $splice: { index: number, removes: number, inserts: T[] } }
+  | { $splice: { index: number, remove: number, insert: T } }
   | { $swap: { first: number, second: number } }
   | { $remove: number }
-  | { $push: Many<T> }
-  | { $unshift: Many<T> }
+  | { $push: T }
+  | { $unshift: T }
   | { $replace: T }
   | { $batch: RawPatch<T>[] }
   | { $patch: Partial<T> }
@@ -54,49 +55,54 @@ export function preparePatch<T>(value: T, patch: RawPatch<T>): Patch<T> {
   if (Array.isArray(patch)) {
     return { tag: 'batch', patches: patch.map(p => preparePatch(value, p)) };
   }
-  
+
+  if ('$batch' in patch) {
+    return { tag: 'batch', patches: patch.$batch.map(p => preparePatch(value, p)) };
+  }
+    
   if ('$at' in patch) {
     const keys = Array.isArray(patch.$at) ? patch.$at : [patch.$at];
     const v = keys.reduce((acc, k) => acc[k], value);
     return keys.reduceRight<Patch<T>>((patch, key) => ({ tag: 'key', key, patch }), preparePatch(v, patch.patch));
   }
-
-  if ('$splice' in patch) {
-    const { index, removes, inserts } = patch.$splice;
-    return { tag: 'array-splice', index, removes, inserts };
-  }
-  
-  if ('$swap' in patch) {
-    const { first, second } = patch.$swap;
-    return { tag: 'array-swap', first, second };
-  }
-  
-  if ('$push' in patch) {
-    const v = value as any as any[];
-    const inserts = Array.isArray(patch.$push) ? patch.$push : [patch.$push];
-    const index = v.length;
-    return { tag: 'array-splice', index, removes: 0, inserts };
-  }
-  
-  if ('$unshift' in patch) {
-    const inserts = Array.isArray(patch.$unshift) ? patch.$unshift : [patch.$unshift];
-    return { tag: 'array-splice', index: 0, removes: 0, inserts };
-  }
   
   if ('$replace' in patch) {
     return { tag: 'replace', prev: value, next: patch.$replace };
-  }
-  
-  if ('$batch' in patch) {
-    return { tag: 'batch', patches: patch.$batch.map(p => preparePatch(value, p)) };
-  }
-  
+  } 
+
   if ('$patch' in patch) {
     return { tag: 'batch', patches: Object.keys(patch.$patch).map<Patch<any>>(key => ({ tag: 'key', key, patch: { tag: 'replace', prev: value[key], next: patch.$patch[key] } })) };
   }
+ 
+  const v = value as any as any[];
+  if ('$splice' in patch) {
+    const { index, insert } = patch.$splice;
+    const remove = v.slice(patch.$splice.index, patch.$splice.remove) as any;
+    return { tag: 'array-splice', index, remove, insert };
+  }
+  
+  if ('$swap' in patch) {
+    const { first: firstIdx, second: secondIdx } = patch.$swap;
+    return { tag: 'array-swap', first: v[firstIdx], firstIdx, second: v[secondIdx], secondIdx };
+  }
+  
+  if ('$push' in patch) {
+    const insert: any = Array.isArray(patch.$push) ? patch.$push : [patch.$push];
+    const remove: any = [];
+    const index = v.length;
+    return { tag: 'array-splice', index, remove, insert };
+  }
+  
+  if ('$unshift' in patch) {
+    const insert: any = Array.isArray(patch.$unshift) ? patch.$unshift : [patch.$unshift];
+    const remove: any = [];
+    return { tag: 'array-splice', index: 0, remove, insert };
+  }
   
   if ('$remove' in patch) {
-    return { tag: 'array-splice', index: patch.$remove, removes: 1, inserts: [] };
+    const remove: any = v.slice(patch.$remove, patch.$remove + 1);
+    const insert: any = [];
+    return { tag: 'array-splice', index: patch.$remove, remove, insert };
   }
   
   return absurd(patch);
@@ -120,28 +126,6 @@ export function applyPatch<T>(value: T, patch: Patch<T>, destructively = false):
     }
   }
 
-  if (patch.tag === 'array-splice') {
-    const v = value as any as any[];
-    if (destructively) {
-      v.splice(patch.index, patch.removes, ...patch.inserts);
-      return v as any as T;
-    } else {
-      const nextValue = v.slice(0); nextValue.splice(patch.index, patch.removes, ...patch.inserts);
-      return nextValue as any as T;
-    }
-  }
-
-  if (patch.tag === 'array-swap') {
-    const v = value as any as any[];
-    if (destructively) {
-      const tmp = v[patch.first]; v[patch.first] = v[patch.second]; v[patch.second] = tmp;
-      return v as any as T;
-    } else {
-      const nextValue = v.slice(0); nextValue[patch.first] = value[patch.second]; nextValue[patch.second] = value[patch.first];
-      return nextValue as any as T;
-    }    
-  }
-
   if (patch.tag === 'batch') {
     return patch.patches.reduce<T>((acc, p) => applyPatch(acc, p, destructively), value);
   }
@@ -150,6 +134,37 @@ export function applyPatch<T>(value: T, patch: Patch<T>, destructively = false):
     return patch.next;
   }
   
+  const v = value as any as any[];
+  
+  if (patch.tag === 'array-splice') {
+    const { index, insert, remove } = patch as any as SplicePatch<any[]>;
+    if (remove.length !== 0 && v[index] !== remove[0]) {
+      return v as any;
+    }
+    if (insert.length !== 0 && v[index] === insert[0]) {
+      return v as any;
+    }
+    
+    if (destructively) {
+      v.splice(index, remove.length, ...insert);
+      return v as any;
+    } else {
+      const nextValue = v.slice(0); nextValue.splice(index, remove.length, ...insert);
+      return nextValue as any;
+    }
+  }
+
+  if (patch.tag === 'array-swap') {
+    if (v[patch.firstIdx] === patch.second) return v as any;
+    if (destructively) {
+      const tmp = v[patch.firstIdx]; v[patch.firstIdx] = v[patch.secondIdx]; v[patch.secondIdx] = tmp;
+      return v as any;
+    } else {
+      const nextValue = v.slice(0); nextValue[patch.firstIdx] = value[patch.secondIdx]; nextValue[patch.secondIdx] = value[patch.firstIdx];
+      return nextValue as any;
+    }    
+  }
+
   return absurd(patch);
 }
 
@@ -527,14 +542,15 @@ export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, A
     const p = patch.patch as Patch<any>;
 
     if (p.tag === 'array-splice') {
-      for (let i = p.removes - 1; i >= 0; i--) {
-        const ch = el.childNodes[p.index + i];
+      const { index, insert, remove } = p as any as SplicePatch<any[]>;
+      for (let i = remove.length - 1; i >= 0; i--) {
+        const ch = el.childNodes[index + i];
         el.removeChild(ch);
       }
       const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel(), idx });
-      p.inserts.forEach((item, idx) => {
-        const ch = create(sdom._item, getChildModel(p.index + idx));
-        el.insertBefore(ch, el.childNodes[p.index + idx] || null);
+      insert.forEach((item, idx) => {
+        const ch = create(sdom._item, getChildModel(index + idx));
+        el.insertBefore(ch, el.childNodes[index + idx] || null);
       });
       return el;
     }
@@ -654,3 +670,5 @@ export function ensure<T>(value: T): T {
   return value;
 }
 
+
+type SplicePatch<T> = { tag: 'array-splice', index: number, remove: T, insert: T };
