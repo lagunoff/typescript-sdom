@@ -225,8 +225,8 @@ export class SDOMElement<Model, Action> extends SDOMBase<Model, Action> {
     return this;
   }
   
-  childs(...childs: SDOM<Model, Action>[]) {
-    this._childs = childs;
+  childs(...childs: RawSDOM<Model, Action>[]) {
+    this._childs = childs.map(prepareSDOM);
     return this;
   }
 }
