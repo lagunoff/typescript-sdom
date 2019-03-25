@@ -65,7 +65,10 @@ export const view = h.div<Model, Action>(
       }),
       h.label('Mark all as complete').attrs({ for: 'toggle-all' }),
       h.ul({ class: 'todo-list' }).childs(
-        array<Model, Action, 'todos'>('todos', todo.view.dimap(zoom('item'), (action, model, el) => ({ tag: '@Todo', action, idx: nodeIndex(el) } as Action))),
+        array<Model, Action, 'todos'>(
+          'todos',
+          todo.view.dimap(zoom('item'), (action, model, el) => ({ tag: '@Todo', action, idx: nodeIndex(el) } as Action))
+        ),
       ),
       h.footer({ class: 'footer' }).childs(
         h.span({ class: 'todo-count'}).childs(h('string', countItemsLeft, ' items left')),
