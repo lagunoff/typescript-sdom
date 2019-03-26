@@ -1,14 +1,16 @@
 import { h, Patch, SDOM, RawPatch } from '../../../src';
+import { Filter } from './';
 
 // Model
 export type Model = {
   title: string;
   completed: boolean;
   editing: string|null;
+  hidden: boolean;
 };
 
 // Init
-export function init(title: string): Model {
+export function init(title: string): Omit<Model, 'hidden'> {
   return { title, completed: false, editing: null };
 }
 
@@ -22,7 +24,7 @@ export type Action =
   | { tag: 'Editing/commit' }
 
 // Update
-export function update(action: Action, model: Model): RawPatch<Model> {
+export function update(action: Action, model: ReturnType<typeof init>): RawPatch<ReturnType<typeof init>> {
   switch (action.tag) {
     case 'Completed': return { $patch: { completed: !model.completed } };
     case 'Destroy': return [];
@@ -42,9 +44,10 @@ export function update(action: Action, model: Model): RawPatch<Model> {
 }
 
 const rootClass = (m: Model) => [m.completed ? 'completed' : '', m.editing !== null ? 'editing' : ''].filter(Boolean).join(' ');
+const rootStyle = (m: Model) => m.hidden ? 'display: none;' : '';
 
 // View
-export const view: SDOM<Model, Action> = h.li({ class: rootClass }).childs(
+export const view: SDOM<Model, Action> = h.li({ class: rootClass, style: rootStyle }).childs(
   h.div({ class: 'view' }).on({
     dblclick: event => ({ tag: 'Editing/on', event }),
   }).childs(
@@ -52,7 +55,7 @@ export const view: SDOM<Model, Action> = h.li({ class: rootClass }).childs(
       click: () => ({ tag: 'Completed' }),
     }),
     h.label((m: Model) => m.title),
-    h.button({ class: 'destroy '}).on({
+    h.button({ class: 'destroy' }).on({
       click: () => ({ tag: 'Destroy' }),
     }),
   ),
@@ -70,3 +73,6 @@ function handleKeydown(event: KeyboardEvent): Action|void {
 
 const KEY_ENTER = 13;
 const KEY_ESCAPE = 27;
+
+
+export type Omit<T, U extends keyof T> = { [K in Exclude<keyof T, U>]: T[K] };
