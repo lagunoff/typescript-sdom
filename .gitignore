@@ -3,6 +3,7 @@
 /node_modules/
 /scripts/node_modules/
 /examples/*/node_modules/
+/examples/*/dist/
 **/*~
 **/*.kate-swp
 **/.directory
