@@ -271,7 +271,7 @@ export function prop<Model, Action>(value: string|number|boolean|((model: Model)
   return new SDOMProp(value);
 }
 
-export function event<Model, Action>(listener: (e: Event, model: Model) => void): SDOMEvent<Model, Action> {
+export function event<Model, Action>(listener: (e: Event, model: Model) => void|Action): SDOMEvent<Model, Action> {
   return new SDOMEvent(listener);
 }
 
