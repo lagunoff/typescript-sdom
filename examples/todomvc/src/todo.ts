@@ -1,5 +1,4 @@
-import { h, Patch, SDOM, RawPatch } from '../../../src';
-import { Filter } from './';
+import { h, SDOM } from '../../../src';
 
 // Model
 export type Model = {
@@ -24,21 +23,21 @@ export type Action =
   | { tag: 'Editing/commit' }
 
 // Update
-export function update(action: Action, model: ReturnType<typeof init>): RawPatch<ReturnType<typeof init>> {
+export function update(action: Action, model: ReturnType<typeof init>): ReturnType<typeof init> {
   switch (action.tag) {
-    case 'Completed': return { $patch: { completed: !model.completed } };
-    case 'Destroy': return [];
+    case 'Completed': return { ...model, completed: !model.completed };
+    case 'Destroy': return model;
     case 'Editing/on': {
       const rootEl: HTMLElement = action.event.currentTarget as any;
       const inputEl = rootEl.parentElement!.querySelector('input.edit') as HTMLInputElement|null;
       setTimeout(() => inputEl && inputEl.focus(), 100);
-      return { $patch: { editing: model.title } };
+      return { ...model, editing: model.title };
     }
-    case 'Editing/input': return { $patch: { editing: action.value } };
-    case 'Editing/cancel': return { $patch: { editing: null } };
+    case 'Editing/input': return { ...model, editing: action.value };
+    case 'Editing/cancel': return { ...model, editing: null };
     case 'Editing/commit': {
-      if (model.editing === null) return [];
-      return { $patch: { title: model.editing || '', editing: null } };
+      if (model.editing === null) return model;
+      return { ...model, title: model.editing || '', editing: null };
     }
   }
 }

@@ -1,20 +1,16 @@
 import { absurd } from './types';
-import { Jet } from './incremental';
-import { Patch, noop, isNoop, applyPatch, unapplyPatch } from './patch';
 
 
-const NODE_DATA = '__SDOM_CUSTOM_DATA__';
+export const SDOM_DATA = '__SDOM_DATA__';
 
 
 export type SDOM<Model, Action=never> =
   | SDOMElement<Model, Action>
   | SDOMText<Model, Action>
-  | SDOMDiscriminate<Model, Action>
   | SDOMArray<Model, Action>
-  | SDOMPick<Model, Action>
   | SDOMCustom<Model, Action>
-  | SDOMMap<Model, Action>
-  | SDOMComap<Model, Action>
+  | SDOMDiscriminate<Model, Action>
+  | SDOMDimap<Model, Action>
   ;
 
 export type RawSDOM<Model, Action> = SDOM<Model, Action>|string|number|((m: Model) => string|number);
@@ -24,32 +20,37 @@ export function prepareSDOM<Model, Action>(raw: RawSDOM<Model, Action>): SDOM<Mo
   return new SDOMText(raw);
 }
 
-
 export type SDOMAttribute<Model, Action> =
   | SDOMAttr<Model, Action>
   | SDOMProp<Model, Action>
   | SDOMEvent<Model, Action>
 ;
 
+// A callback for producing messages
+export type Sink<Action> = (action: Action) => void;
+
+// Previous result of rendering
+export type Prev<Model> = { el: HTMLElement|Text, model: Model };
+
 // Base class is needed for instance method in `SDOM`
 export class SDOMBase<Model, Action> {
-  map<B>(proj: (action: Action) => B): SDOMMap<Model, B> {
-    return new SDOMMap(this as any, proj);
+  map<B>(proj: (action: Action) => B): SDOMDimap<Model, B> {
+    return this.dimap(id, proj);
   }
   
-  comap<B>(coproj: (b: Jet<B>) => Jet<Model>): SDOMComap<B, Action> {
-    return new SDOMComap(this as any, coproj);
+  comap<B>(coproj: (b: B) => Model): SDOMDimap<B, Action> {
+    return this.dimap(coproj, id);
   }
   
-  dimap<B, C>(coproj: (b: Jet<B>) => Jet<Model>, proj: (action: Action, model: B, el: HTMLElement) => C): SDOM<B, C> {
-    return new SDOMMap(new SDOMComap(this as any, coproj), proj as any);
+  dimap<B, C>(coproj: (b: B) => Model, proj: (action: Action) => C): SDOMDimap<B, C> {
+    return new SDOMDimap(this as any, coproj, proj);
   }
 }
 
 export class SDOMElement<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
     public _name: string,
-    public _attributes: Record<string, SDOMAttribute<Model, Action>>,
+    public _attrs: Record<string, SDOMAttribute<Model, Action>>,
     public _childs: SDOM<Model, Action>[],
   ) { super(); }
 
@@ -57,7 +58,7 @@ export class SDOMElement<Model, Action> extends SDOMBase<Model, Action> {
     for (const k in attrs) {
       if (!isAttribute(attrs[k])) attrs[k] = new SDOMAttr(attrs[k] as any);
     }
-    Object.assign(this._attributes, attrs);
+    Object.assign(this._attrs, attrs);
     return this;
   }
   
@@ -65,7 +66,7 @@ export class SDOMElement<Model, Action> extends SDOMBase<Model, Action> {
     for (const k in attrs) {
       if (!isAttribute(attrs[k])) attrs[k] = new SDOMProp(attrs[k] as any);
     }
-    Object.assign(this._attributes, attrs);
+    Object.assign(this._attrs, attrs);
     return this;
   }
   
@@ -73,7 +74,7 @@ export class SDOMElement<Model, Action> extends SDOMBase<Model, Action> {
     for (const k in attrs) {
       attrs[k] = new SDOMEvent(attrs[k] as any) as any;
     }
-    Object.assign(this._attributes, attrs);
+    Object.assign(this._attrs, attrs);
     return this;
   }
   
@@ -91,10 +92,7 @@ export function nodeIndex(el: HTMLElement) {
   return i;
 }
 
-
 export type Listener<Model, Action> = (e: Event, model: Model) => Action|void;
-
-
 
 export class SDOMText<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
@@ -102,47 +100,33 @@ export class SDOMText<Model, Action> extends SDOMBase<Model, Action> {
   ) { super(); }
 }
 
-export class SDOMDiscriminate<Model, Action> extends SDOMBase<Model, Action> {
-  constructor(
-    readonly _discriminator: string[],
-    readonly _tags: Record<string, SDOM<Model, Action>>,
-  ) { super(); }
-}
-
 export class SDOMArray<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
-    readonly _discriminator: string,
+    readonly _discriminator: (m: Model) => any[],
     readonly _item: SDOM<any, any>,
     readonly _name: string,
-    readonly _attributes: Record<string, SDOMAttribute<Model, Action>>,
+    readonly _attrs: Record<string, SDOMAttribute<Model, Action>>,
   ) { super(); }
 }
 
-export class SDOMPick<Model, Action> extends SDOMBase<Model, Action> {
+export class SDOMDiscriminate<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
-    readonly _keys: Array<string|number|symbol>,
-    readonly _sdom: SDOM<Partial<Model>, Action>,
+    readonly _discriminator: (m: Model) => string,
+    readonly _tags: Record<string, SDOM<Model, Action>>,
   ) { super(); }
 }
 
 export class SDOMCustom<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
-    readonly _create: (getModel: () => Model) => HTMLElement|Text,
-    readonly _actuate: (el: HTMLElement|Text, jet: Jet<Model>) => HTMLElement|Text,
+    readonly _actuate: (sink: Sink<Action>, prev: Prev<Model>|null, next: Model) => HTMLElement|Text,
   ) { super(); }
 }
 
-class SDOMMap<Model, Action> extends SDOMBase<Model, Action> {
+class SDOMDimap<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
     readonly _value: SDOM<Model, Action>,
-    readonly _proj: (x: any, model: Model) => Action,
-  ) { super(); }
-}
-
-class SDOMComap<Model, Action> extends SDOMBase<Model, Action> {
-  constructor(
-    readonly _value: SDOM<any, Action>,
-    readonly _coproj: (b: Jet<Model>) => Jet<any>
+    readonly _coproj: (b: Model) => any,
+    readonly _proj: (x: any) => Action,
   ) { super(); }
 }
 
@@ -164,15 +148,12 @@ export class SDOMEvent<Model, Action> {
   ) {}  
 }
 
-
 function isAttribute(attr: unknown): attr is SDOMAttribute<any, any> {
   return attr instanceof SDOMAttr || attr instanceof SDOMProp || attr instanceof SDOMEvent;
 }
 
-
 export type Many<T> = T|T[];
 export type RawAttribute<Model, Action> = SDOMAttribute<Model, Action>|string|number|boolean|((model: Model) => string|number|boolean);
-
 
 export function h<Model, Action=never>(name: string, attrs: Record<string, RawAttribute<Model, Action>>, ...childs: RawSDOM<Model, Action>[]): SDOMElement<Model, Action>;
 export function h<Model, Action=never>(name: string, ...childs: RawSDOM<Model, Action>[]): SDOMElement<Model, Action>;
@@ -224,25 +205,17 @@ export namespace h {
   export const footer = h.bind(void 0, 'footer') as BoundH;
 }
 
-
 export function text(value: string): SDOMText<{}, never> {
   return new SDOMText(value);
-}
-
-
-export function discriminate<Model, Action>(discriminator: keyof Model);
-export function discriminate<Model, K extends keyof Model>(k1: K, k2: keyof Model[K]);
-export function discriminate<Model, Action>(...discriminators) {
-  return <T extends Record<string, SDOM<Model, Action>>>(tags: T) => new SDOMDiscriminate<Model, Action>(discriminators, tags);
 }
 
 // @ts-ignore
 type TK<M, K> = M[K][number];
 
 
-export function array<Model, Action, K extends keyof Model>(discriminator: K, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>): SDOM<Model, Action>;
-export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>): SDOM<Model, Action>;
-export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, attributes: Record<string, RawAttribute<Model, Action>>, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>): SDOM<Model, Action>;
+export function array<Model, Action, K extends keyof Model>(discriminator: K, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>): SDOM<Model, { action: Action, idx: number }>;
+export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>): SDOM<Model, { action: Action, idx: number }>;
+export function array<Model, Action, K extends keyof Model>(discriminator: K, name: string, attributes: Record<string, RawAttribute<Model, Action>>, child: SDOM<{ item: TK<Model, K>, model: Model }, Action>): SDOM<Model, { action: Action, idx: number }>;
 export function array<Model, Action, K extends keyof Model>(): SDOM<Model, Action> {
   // @ts-ignore
   const [discriminator, name, attributes, child]
@@ -251,7 +224,7 @@ export function array<Model, Action, K extends keyof Model>(): SDOM<Model, Actio
     : arguments
   ;
   
-  return new SDOMArray<Model, Action>(discriminator, child, name, prepareAttrs(name, attributes));
+  return new SDOMArray<Model, Action>(m => m[discriminator], child, name, prepareAttrs(name, attributes));
 
   function prepareAttrs(name: string, attrs) {
     for (const k in attrs) {
@@ -275,266 +248,167 @@ export function event<Model, Action>(listener: (e: Event, model: Model) => void|
   return new SDOMEvent(listener);
 }
 
-
-export function create<Model, Action>(sdom: SDOM<Model, Action>, getModel: () => Model): HTMLElement|Text {
+export function actuate<Model, Action>(sink: Sink<Action>, prev: Prev<Model>|null, next: Model, sdom: SDOM<Model, Action>): HTMLElement|Text {
   if (sdom instanceof SDOMElement) {
-    const el = document.createElement(sdom._name);
-    Object.keys(sdom._attributes).forEach(k => applyAttribute(k, sdom._attributes[k], el, Jet.of(getModel()), true));
-    sdom._childs.forEach(ch => el.appendChild(create(ch, getModel)));
-    return el;
-  }
-  
-  if (sdom instanceof SDOMText) {
-    const text = typeof (sdom._value) === 'function' ? sdom._value(getModel()) : sdom._value;
-    const el = document.createTextNode(String(text));
-    return el;
-  }
-    
-  if (sdom instanceof SDOMDiscriminate) {
-    const ch = sdom._tags[sdom._discriminator.reduce((acc, k) => acc[k], getModel())];
-    const el = create(ch, getModel);
-    if (el instanceof Text) throw new Error(`elements of discriminate should be DOM nodes, not text`);
-    el.dataset.tag = sdom._discriminator.reduce((acc, k) => acc[k], getModel());
-    return el;
-  }
-  
-  if (sdom instanceof SDOMArray) {
-    const array = getModel()[sdom._discriminator] as any[];
-    const el = document.createElement(sdom._name);
-    Object.keys(sdom._attributes).forEach(k => applyAttribute(k, sdom._attributes[k], el, Jet.of(getModel()), true));
-    const getChildModel = (idx) => () => ({ item: getModel()[sdom._discriminator][idx], model: getModel() });
-    array.forEach((item, idx) => {
-      const ch = create(sdom._item, getChildModel(idx));
-      el.appendChild(ch);
-    });
-    return el;
-  }
-  
-  if (sdom instanceof SDOMPick) {
-    const el = create(sdom._sdom, getModel);
-    return el;
-  }
-  
-  if (sdom instanceof SDOMCustom) {
-    return sdom._create(getModel);
-  }
-  
-  if (sdom instanceof SDOMMap) {
-    const el = create(sdom._value, getModel);
-    el[NODE_DATA] = { proj: sdom._proj, getModel };
-    return el;
-  }
-  
-  if (sdom instanceof SDOMComap) {
-    const _getModel = () => sdom._coproj(new Jet(getModel(), noop))._position;
-    const el = create(sdom._value, _getModel);
-    return el;
-  }
-  
-  return absurd(sdom);
-}
-
-
-export function actuate<Model, Action>(el: HTMLElement|Text, sdom: SDOM<Model, Action>, jet: Jet<Model>): HTMLElement|Text {
-  if (jet._velocity.tag === 'batch') {
-    let model = jet._position;
-    let elem = el;
-    for (const p of jet._velocity.patches) {
-      elem = actuate(elem, sdom, new Jet(model, p));
-      model = applyPatch(model, p, true);
+    if (!prev) {
+      // Create new element
+      const el = document.createElement(sdom._name);
+      Object.keys(sdom._attrs).forEach(k => applyAttribute(k, sdom._attrs[k], el, null, next));
+      sdom._childs.forEach(ch => el.appendChild(actuate(sink, null, next, ch)));
+      return el;      
+    } else {
+      // Update existing element
+      const { el } = prev;
+      if (!(el instanceof HTMLElement)) throw new Error('actuate: got invalid DOM node');
+      Object.keys(sdom._attrs).forEach(k => applyAttribute(k, sdom._attrs[k], el, prev.model, next));
+      sdom._childs.forEach((childSdom, idx) => {
+        const ch = el.childNodes[idx] as any;
+        const nextCh = actuate(sink, { el: ch, model: prev.model }, next, childSdom);
+        if (ch !== nextCh) el.replaceChild(nextCh, ch);
+      });
+      return el;
     }
-    return elem;
-  }
-  
-  if (sdom instanceof SDOMElement) {
-    if (!(el instanceof HTMLElement)) throw new Error('actuate: got invalid DOM node');
-    Object.keys(sdom._attributes).forEach(k => applyAttribute(k, sdom._attributes[k], el, jet, false));
-    sdom._childs.forEach((s, idx) => {
-      const ch = el.childNodes[idx] as any;
-      const nextCh = actuate(ch, s, jet);
-      if (ch !== nextCh) el.replaceChild(nextCh, ch);
-    });
-    return el;
   }
     
   if (sdom instanceof SDOMText) {
-    if (typeof (sdom._value) === 'function') {
-      if (!(el instanceof Text)) throw new Error('actuate: got invalid DOM node');
-      const model = applyPatch(jet._position, jet._velocity, true);
-      const next = sdom._value(model);
-      if (el.nodeValue !== next) el.nodeValue = String(next);
-      unapplyPatch(model, jet._velocity, true);
+    if (!prev) {
+      // Create new text node
+      const text = typeof (sdom._value) === 'function' ? sdom._value(next) : sdom._value;
+      const el = document.createTextNode(String(text));
+      return el;      
+    } else {
+      // Update existing text node
+      const { el } = prev;
+      if (typeof (sdom._value) === 'function') {
+        if (!(el instanceof Text)) throw new Error('actuate: got invalid DOM node');
+        const nextValue = sdom._value(next);
+        if (el.nodeValue !== nextValue) el.nodeValue = String(nextValue);
+        return el;
+      }
+      // Don't update static text
       return el;
     }
-    return el;
   }
 
   if (sdom instanceof SDOMDiscriminate) {
-    if (el instanceof Text) throw new Error(`elements of discriminate should be DOM nodes, not text`);
-    if (el.dataset.tag !== sdom._discriminator.reduce((acc, k) => acc[k], jet._position)) {
-      return create(sdom, () => jet._position);
+    if (!prev) {
+      // Create new node
+      const ch = sdom._tags[sdom._discriminator(next)];
+      return actuate(sink, null, next, ch);
+    } else {
+      // Update existing node
+      const { el } = prev;
+      if (sdom._discriminator(prev.model) !== sdom._discriminator(next)) {
+        return actuate(sink, null, next, sdom._tags[sdom._discriminator(next)]);
+      }
+      return actuate(sink, prev, next, sdom._tags[sdom._discriminator(next)]);
     }
-    return actuate(el, sdom._tags[sdom._discriminator.reduce((acc, k) => acc[k], jet._position)], jet);
   }
 
   if (sdom instanceof SDOMArray) {
-    const array = jet._position[sdom._discriminator] as any[];
-    if ((jet._velocity.tag !== 'key') || (jet._velocity.key !== sdom._discriminator)) {
-      const getChildJet = (idx) => new Jet({ item: jet._position[sdom._discriminator][idx], model: jet._position, idx }, { tag: 'key', key: 'model', patch: jet._velocity });
-      array.forEach((item, idx) => {
-        const ch = el.childNodes[idx] as HTMLElement;
-        const nextCh = actuate(ch, sdom._item, getChildJet(idx));
-        if (ch !== nextCh) {
-          el.replaceChild(nextCh, ch);
-        }
-      })
-      return el;
-    };
-
-    return actuateArray(el as HTMLElement, sdom, jet._position, new Jet(array, jet._velocity.patch));
-  }
-
-  if (sdom instanceof SDOMPick) {
-    if (jet._velocity.tag === 'key') {
-      if (sdom._keys.indexOf(jet._velocity.key as keyof Model) === -1) return el;
-    }
-    return actuate(el, sdom._sdom, jet);
-  }
-
-  if (sdom instanceof SDOMCustom) {
-    return sdom._actuate(el, jet);
-  }
-
-  if (sdom instanceof SDOMMap) {
-    const nextEl = actuate(el, sdom._value, jet);
-    if (nextEl !== el) {
-      nextEl[NODE_DATA] = { proj: sdom._proj, jet };
-    }
-
-    return nextEl;
-  }
-  
-  if (sdom instanceof SDOMComap) {
-    const nextEl = actuate(el, sdom._value, sdom._coproj(jet));
-    return nextEl;
-  }
-  
-  return absurd(sdom);
-}
-
-
-function actuateArray<Model, Action>(el: HTMLElement, sdom: SDOMArray<Model, Action>, parent: any, jet: Jet<Model>): HTMLElement {
-  const array = jet._position;
-  const p = jet._velocity;
-
-  if (p.tag === 'array-splice') {
-    const { index, insert, remove } = p as any as SplicePatch<any[]>;
-    for (let i = remove.length - 1; i >= 0; i--) {
-      const ch = el.childNodes[index + i];
-      el.removeChild(ch);
-    }
-    const getIdx = idx => idx < index ? array[idx] : idx >= index && idx < index + insert.length ? insert[idx - index] : array[idx - insert.length + remove.length];
-    const getChildModel = (idx) => () => ({ item: getIdx(idx), model: parent, idx });
-    insert.forEach((item, idx) => {
-      const ch = create(sdom._item, getChildModel(index + idx));
-      el.insertBefore(ch, el.childNodes[index + idx] || null);
+    // Create new element
+    const xs = sdom._discriminator(next);
+    const el = document.createElement(sdom._name);
+    Object.keys(sdom._attrs).forEach(k => applyAttribute(k, sdom._attrs[k], el, null, next));
+    xs.forEach((item, idx) => {
+      const childEl = actuate(sink, null, { item, model: next }, sdom._item);
+      childEl[SDOM_DATA] = childEl[SDOM_DATA] || {};
+      const { coproj, proj } = childEl[SDOM_DATA];
+      childEl[SDOM_DATA].coproj = model => {
+        const item = sdom._discriminator(model)[idx];
+        model = { model, item };
+        return coproj ? coproj(model) : model;
+      };
+      childEl[SDOM_DATA].proj = action => {
+        if (proj) action = proj(action);
+        return { action, idx };
+      };
+      el.appendChild(childEl);
     });
     return el;
   }
-  
-  if (p.tag === 'key') {
-    const ch = el.childNodes[p.key] as HTMLElement;
-    const getChildJet = (idx) => new Jet({ item: parent[sdom._discriminator][idx], model: parent, idx }, { tag: 'key', key: 'item', patch: p.patch });
-    const nextCh = actuate(ch, sdom._item, getChildJet(p.key));
-    if (ch !== nextCh) el.replaceChild(nextCh, ch);
-    return el;
+
+  if (sdom instanceof SDOMCustom) {
+    return sdom._actuate(sink, prev, next);
   }
 
-  if (p.tag === 'array-swap') {
-    const ch1 = el.childNodes[p.first];
-    const ch2 = el.childNodes[p.second];
-    el.removeChild(ch2);
-    el.insertBefore(ch2, ch1);
-    el.removeChild(ch1);
-    el.insertBefore(ch1, el.childNodes[p.second] || null);
-    return el;
-  }
-
-  if (p.tag === 'replace') {
-    return create(sdom, () => parent) as HTMLElement;
-  }
-
-  if (p.tag === 'batch') {
-    let model = jet._position;
-    let elem = el;
-    for (const patch of p.patches) {
-      elem = actuateArray(elem, sdom, parent, new Jet(model, patch));
-      model = applyPatch(model, patch, true);
+  if (sdom instanceof SDOMDimap) {
+    const chPrev = prev ? { el: prev.el, model: sdom._coproj(prev.model) } : null;
+    const nextEl = actuate(sink, chPrev, sdom._coproj(next), sdom._value);
+    if (!prev || nextEl !== prev.el) {
+      nextEl[SDOM_DATA] = nextEl[SDOM_DATA] || {};
+      const { coproj, proj } = nextEl[SDOM_DATA];
+      nextEl[SDOM_DATA].coproj = model => {
+        model = sdom._coproj(model);
+        return coproj ? coproj(model) : model;
+      };
+      nextEl[SDOM_DATA].proj = action => {
+        if (proj) action = proj(action);
+        return sdom._proj(action);
+      };
     }
-    return elem;
+    return nextEl;
   }
-  
-  return absurd(p);
+  return absurd(sdom);
 }
 
-function applyAttribute<Model, Action>(name: string, sdomAttr: SDOMAttribute<Model, Action>, el: HTMLElement, jet: Jet<Model>, create: boolean) {
+function applyAttribute<Model, Action>(name: string, sdomAttr: SDOMAttribute<Model, Action>, el: HTMLElement, prev: Model|null, next: Model) {
   if (sdomAttr instanceof SDOMAttr) {
-    const model = applyPatch(jet._position, jet._velocity, true);
-    const next = typeof(sdomAttr._value) === 'function' ? sdomAttr._value(model) : sdomAttr._value;
+    const nextValue = typeof(sdomAttr._value) === 'function' ? sdomAttr._value(next) : sdomAttr._value;
     if (!el.hasAttribute(name)) {
-      el.setAttribute(name, String(next));
-      unapplyPatch(model, jet._velocity, true);
+      el.setAttribute(name, String(nextValue));
       return;
     }
-    unapplyPatch(model, jet._velocity, true);
     // Either nothing changes or the new value is the same as previous
-    if (isNoop(jet._velocity) || (el.getAttribute(name) == next)) return;
-    el.setAttribute(name, String(next));
+    if ((el.getAttribute(name) == nextValue)) return;
+    el.setAttribute(name, String(nextValue));
     return;
   }
   
   if (sdomAttr instanceof SDOMProp) {
-    const model = applyPatch(jet._position, jet._velocity, true);
-    const next = typeof(sdomAttr._value) === 'function' ? sdomAttr._value(model) : sdomAttr._value;
-    unapplyPatch(model, jet._velocity, true);
+    const nextValue = typeof(sdomAttr._value) === 'function' ? sdomAttr._value(next) : sdomAttr._value;
     // Either nothing changes or the new value is the same as previous
-    if ((el[name] == next)) return;
-    el[name] = next;
+    if ((el[name] == nextValue)) return;
+    el[name] = nextValue;
     return;
   }    
 
-  if (!create) return;
+  // Do not re-attach event listeners
+  if (prev) return;
 
   if (sdomAttr instanceof SDOMEvent) {
-    el.addEventListener(name, createEventListener(() => jet._position, sdomAttr._listener));
+    el.addEventListener(name, createEventListener(sdomAttr._listener));
     return;
   }
   return;
 }
 
-
-function createEventListener<Model, Action>(getModel: () => Model, cb: (e: Event, model: Model) => Action|void): EventListener {
+function createEventListener<Model, Action>(cb: (e: Event, model: Model) => Action|void): EventListener {
   return e => {
     let iter = e.target as HTMLElement|null;
     let action = void 0 as Action|void;
-    let actionInitialized = false;
+    const coprojs: Function[] = [];
+    const projs: Function[] = [];
     
     for (; iter; iter = iter.parentElement) {
-      const nodeData = iter[NODE_DATA];
+      const nodeData = iter[SDOM_DATA];
       if (!nodeData) continue;
-      if ('getModel' in nodeData) getModel = nodeData.getModel;
-      if (!actionInitialized) {
-        action = cb(e, getModel());
-        actionInitialized = true;
-        if (action === void 0) return;
+      if ('coproj' in nodeData) coprojs.push(nodeData.coproj);
+      if ('proj' in nodeData) projs.push(nodeData.proj);
+      if ('model' in nodeData) {
+        const model = coprojs.reduceRight((acc, f) => f(acc), nodeData.model);
+        action = cb(e, model); if (!action) return;
+        action = projs.reduce((acc, f) => f(acc), action);
+        break;
       }
-
-      if (actionInitialized && ('proj' in nodeData)) {
-        action = nodeData.proj(action, getModel(), iter);
-      }
+    }
+    if (!action) return;
+    for (; iter; iter = iter.parentElement) {
+      const nodeData = iter[SDOM_DATA];
+      if (!nodeData) continue;
+      if ('proj' in nodeData) action = nodeData.proj(action);
     }
   };
 }
 
-
-export type SplicePatch<T> = { tag: 'array-splice', index: number, remove: T, insert: T };
+const id = <A>(a: A) => a;
