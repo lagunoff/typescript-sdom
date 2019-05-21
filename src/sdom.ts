@@ -26,9 +26,6 @@ export type SDOMAttribute<Model, Action> =
   | SDOMEvent<Model, Action>
 ;
 
-// A callback for producing messages
-export type Sink<Action> = (action: Action) => void;
-
 // Previous result of rendering
 export type Prev<Model> = { el: HTMLElement|Text, model: Model };
 
@@ -118,7 +115,7 @@ export class SDOMDiscriminate<Model, Action> extends SDOMBase<Model, Action> {
 
 export class SDOMCustom<Model, Action> extends SDOMBase<Model, Action> {
   constructor(
-    readonly _actuate: (sink: Sink<Action>, prev: Prev<Model>|null, next: Model) => HTMLElement|Text,
+    readonly _actuate: (prev: Prev<Model>|null, next: Model) => HTMLElement|Text,
   ) { super(); }
 }
 
@@ -248,13 +245,13 @@ export function event<Model, Action>(listener: (e: Event, model: Model) => void|
   return new SDOMEvent(listener);
 }
 
-export function actuate<Model, Action>(sink: Sink<Action>, prev: Prev<Model>|null, next: Model, sdom: SDOM<Model, Action>): HTMLElement|Text {
+export function actuate<Model, Action>(prev: Prev<Model>|null, next: Model, sdom: SDOM<Model, Action>): HTMLElement|Text {
   if (sdom instanceof SDOMElement) {
     if (!prev) {
       // Create new element
       const el = document.createElement(sdom._name);
       Object.keys(sdom._attrs).forEach(k => applyAttribute(k, sdom._attrs[k], el, null, next));
-      sdom._childs.forEach(ch => el.appendChild(actuate(sink, null, next, ch)));
+      sdom._childs.forEach(ch => el.appendChild(actuate(null, next, ch)));
       return el;      
     } else {
       // Update existing element
@@ -263,7 +260,7 @@ export function actuate<Model, Action>(sink: Sink<Action>, prev: Prev<Model>|nul
       Object.keys(sdom._attrs).forEach(k => applyAttribute(k, sdom._attrs[k], el, prev.model, next));
       sdom._childs.forEach((childSdom, idx) => {
         const ch = el.childNodes[idx] as any;
-        const nextCh = actuate(sink, { el: ch, model: prev.model }, next, childSdom);
+        const nextCh = actuate({ el: ch, model: prev.model }, next, childSdom);
         if (ch !== nextCh) el.replaceChild(nextCh, ch);
       });
       return el;
@@ -294,14 +291,14 @@ export function actuate<Model, Action>(sink: Sink<Action>, prev: Prev<Model>|nul
     if (!prev) {
       // Create new node
       const ch = sdom._tags[sdom._discriminator(next)];
-      return actuate(sink, null, next, ch);
+      return actuate(null, next, ch);
     } else {
       // Update existing node
       const { el } = prev;
       if (sdom._discriminator(prev.model) !== sdom._discriminator(next)) {
-        return actuate(sink, null, next, sdom._tags[sdom._discriminator(next)]);
+        return actuate(null, next, sdom._tags[sdom._discriminator(next)]);
       }
-      return actuate(sink, prev, next, sdom._tags[sdom._discriminator(next)]);
+      return actuate(prev, next, sdom._tags[sdom._discriminator(next)]);
     }
   }
 
@@ -311,7 +308,7 @@ export function actuate<Model, Action>(sink: Sink<Action>, prev: Prev<Model>|nul
     const el = document.createElement(sdom._name);
     Object.keys(sdom._attrs).forEach(k => applyAttribute(k, sdom._attrs[k], el, null, next));
     xs.forEach((item, idx) => {
-      const childEl = actuate(sink, null, { item, model: next }, sdom._item);
+      const childEl = actuate(null, { item, model: next }, sdom._item);
       childEl[SDOM_DATA] = childEl[SDOM_DATA] || {};
       const { coproj, proj } = childEl[SDOM_DATA];
       childEl[SDOM_DATA].coproj = model => {
@@ -329,12 +326,12 @@ export function actuate<Model, Action>(sink: Sink<Action>, prev: Prev<Model>|nul
   }
 
   if (sdom instanceof SDOMCustom) {
-    return sdom._actuate(sink, prev, next);
+    return sdom._actuate(prev, next);
   }
 
   if (sdom instanceof SDOMDimap) {
     const chPrev = prev ? { el: prev.el, model: sdom._coproj(prev.model) } : null;
-    const nextEl = actuate(sink, chPrev, sdom._coproj(next), sdom._value);
+    const nextEl = actuate(chPrev, sdom._coproj(next), sdom._value);
     if (!prev || nextEl !== prev.el) {
       nextEl[SDOM_DATA] = nextEl[SDOM_DATA] || {};
       const { coproj, proj } = nextEl[SDOM_DATA];

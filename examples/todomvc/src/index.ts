@@ -116,7 +116,7 @@ function allChecked(model: Model): boolean {
 function handleAction(action: Action) {
   const next = update(action, el[SDOM_DATA].model);
   if (next === el[SDOM_DATA].model) return;
-  actuate(() => {}, { el, model }, next, sdom);
+  actuate({ el, model }, next, sdom);
   console.log('action', action);
   console.log('prev.model', el[SDOM_DATA].model);
   console.log('next', next);
@@ -129,7 +129,7 @@ let model: Model = { filter: 'all', todos: [], title: '' };
 const container = document.createElement('div');
 document.body.appendChild(container);
 const sdom = view.map(handleAction)
-const el = actuate(() => {}, null, model, sdom);
+const el = actuate(null, model, sdom);
 el[SDOM_DATA] = el[SDOM_DATA] || {};
 el[SDOM_DATA].model = model;
 window.onpopstate = function(event) {
