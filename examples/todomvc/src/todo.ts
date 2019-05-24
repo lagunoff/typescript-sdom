@@ -1,4 +1,4 @@
-import { h, SDOM } from '../../../src';
+import { h, SDOM, text } from '../../../src';
 
 // Model
 export type Model = {
@@ -46,24 +46,32 @@ const rootClass = (m: Model) => [m.completed ? 'completed' : '', m.editing !== n
 const rootStyle = (m: Model) => m.hidden ? 'display: none;' : '';
 
 // View
-export const view: SDOM<Model, Action> = h.li({ class: rootClass, style: rootStyle }).childs(
-  h.div({ class: 'view' }).on({
-    dblclick: event => ({ tag: 'Editing/on', event }),
-  }).childs(
-    h.input({ class: 'toggle', type: 'checkbox' }).props({ checked: (m: Model) => m.completed }).on({
-      click: () => ({ tag: 'Completed' }),
+export const view = h.li(
+  { className: rootClass, style: rootStyle },
+
+  h.div(
+    { className: 'view', ondblclick: event => ({ tag: 'Editing/on', event }) },
+    
+    h.input({
+      className: 'toggle',
+      type: 'checkbox',
+      checked: (m: Model) => m.completed,
+      onclick: () => ({ tag: 'Completed' }),
     }),
-    h.label((m: Model) => m.title),
-    h.button({ class: 'destroy' }).on({
-      click: () => ({ tag: 'Destroy' }),
-    }),
+    
+    h.label(text((m: Model) => m.title)),
+    
+    h.button({ className: 'destroy', onclick: () => ({ tag: 'Destroy' }) }),
   ),
-  h.input({ class: 'edit' }).props({ value: (m: Model) => m.editing !== null ? m.editing : m.title }).on({
-    input: e => ({ tag: 'Editing/input', value: e['target']!['value'] }),
-    blur: () => ({ tag: 'Editing/commit' }),
-    keydown: handleKeydown,
+  
+  h.input<Model, Action>({
+    className: 'edit',
+    value: (m: Model) => m.editing !== null ? m.editing : m.title,
+    oninput: e => ({ tag: 'Editing/input', value: e['target']!['value'] }),
+    onblur: () => ({ tag: 'Editing/commit' }),
+    onkeydown: handleKeydown,
   }),
-);
+) as SDOM<Model, Action>;
 
 function handleKeydown(event: KeyboardEvent): Action|void {
   if (event.keyCode === KEY_ENTER) return { tag: 'Editing/commit' };

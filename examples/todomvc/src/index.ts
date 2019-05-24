@@ -1,6 +1,7 @@
-import { h, array, actuate, SDOM_DATA } from '../../../src';
+import { h, array, SDOM_DATA, text, dimap, id, unpack } from '../../../src';
 import * as todo from './todo';
-import '../node_modules/todomvc-app-css/index.css';
+import { Prop } from '../../../src/props';
+import css from './css';
 
 // Model
 export type Model = {
@@ -63,46 +64,66 @@ export function update(action: Action, model: Model): Model {
 }
 
 // View
-export const view = h.div<Model, Action>(
-  h.section({ class: 'todoapp' }).childs(
-    h.header({ class: 'header' }).childs(
+export const view = h.div(
+  h.section(
+    { className: 'todoapp' },
+    
+    h.header(
+      { className: 'header' },
       h.h1('Todos'),
-      h.input({ class: 'new-todo', placeholder: 'What needs to be done?', autofocus: true }).props({ value: (m: Model) => m.title }).on({
-        input: e => ({ tag: 'Edit', value: e['target']!['value'] }),
-        keydown: event => ({ tag: 'KeyDown', event }),
+      h.input({
+        className: 'new-todo',
+        placeholder: 'What needs to be done?',
+        autofocus: true,
+        value: (m: Model) => m.title,
+        oninput: e => ({ tag: 'Edit', value: e['target']!['value'] } as Action),
+        onkeydown: event => ({ tag: 'KeyDown', event } as Action),
       }),
     ),
 
-    h.section({ class: 'main' }).childs(
-      h.input({ id: 'toggle-all', class: 'toggle-all', type: 'checkbox' }).props({ checked: allChecked }).on({
-        click: () => ({ tag: 'ToggleAll' }),
+    h.section(
+      { className: 'main' },
+      h.input({
+        id: 'toggle-all',
+        className: 'toggle-all',
+        type: 'checkbox',
+        checked: allChecked,
+        onclick: () => ({ tag: 'ToggleAll' }),
       }),
-      h.label('Mark all as complete').attrs({ for: 'toggle-all' }),
-      // @ts-ignore
-      array<Model, todo.Action, 'todos'>(
-        'todos', 'ul', { class: 'todo-list' },
-        todo.view.comap(m => ({ ...m.item, hidden: false })),
-      ).map(a => ({ tag: '@Todo', ...a })),
-      h.footer({ class: 'footer' }).childs(
-        h.span({ class: 'todo-count'}).childs(h('strong', countItemsLeft), ' items left'),
-        h.ul({ class: 'filters' }).childs(
-          h.li(h.a('All').attrs({ href: '#/', class: (m: Model) => m.filter === 'all' ? 'selected' : '' })),
-          h.li(h.a('Active').attrs({ href: '#/active', class: (m: Model) => m.filter === 'active' ? 'selected' : '' })),
-          h.li(h.a('Completed').attrs({ href: '#/completed', class: (m: Model) => m.filter === 'completed' ? 'selected' : '' })),
+      
+      h.label('Mark all as complete', { for: 'toggle-all' }),
+
+      dimap(id, a => ({ tag: '@Todo', ...a }))(
+        // @ts-ignore
+        array('todos','ul', { className: 'todo-list' }, dimap(m => ({ ...m.item, hidden: !(m.model.filter === 'all' || (m.model.filter === 'completed' && m.item.completed) || (m.model.filter === 'active' && !m.item.completed)) }), id)(todo.view)),
+      ),
+      
+      h.footer(
+        { className: 'footer' },
+        
+        h.span({ className: 'todo-count'}, h('strong', text(countItemsLeft)), ' items left'),
+        
+        h.ul(
+          { className: 'filters' },
+          h.li(h.a('All', { href: '#/', className: selectedIf('all') })),
+          h.li(h.a('Active', { href: '#/active', className: selectedIf('active') })),
+          h.li(h.a('Completed', { href: '#/completed', className: selectedIf('completed') })),
         ),
-        h.button(`Clear completed`).attrs({ class: "clear-completed" }).on({
-          click: () => ({ tag: 'ClearCompleted' })
-        }),
+        
+        h.button('Clear completed', { className: 'clear-completed', onclick: () => ({ tag: 'ClearCompleted' }) })
       ),
     ),
   ),
-
-  h.footer({ class: 'info' }).childs(
+  
+  h.footer(
+    { className: 'info' },
     h.p('Double-click to edit a todo'),
-    h.p('Template by ', h.a('Sindre Sorhus').attrs({ href: "http://sindresorhus.com" })),
-    h.p('Created by ', h.a('Lagunov Vlad').attrs({ href: "https://github.com/lagunoff" })),
-    h.p('Part of ', h.a('TodoMVC').attrs({ href: "http://todomvc.com" })),
+    h.p('Template by ', h.a('Sindre Sorhus', { href: 'http://sindresorhus.com' })),
+    h.p('Created by ', h.a('Lagunov Vlad', { href: 'https://github.com/lagunoff' })),
+    h.p('Part of ', h.a('TodoMVC', { href: 'http://todomvc.com' })),
   ),
+
+  h('style', { type: 'text/css' }, css),
 );
 
 function countItemsLeft(model: Model): number {
@@ -112,11 +133,15 @@ function countItemsLeft(model: Model): number {
 function allChecked(model: Model): boolean {
   return model.todos.reduce((acc, todo) => todo.completed ? (acc && true) : false, true);
 }
+
+function selectedIf(filter: Filter): Prop<Model, string> {
+  return m => m.filter === filter ? 'selected' : '';
+}
  
 function handleAction(action: Action) {
   const next = update(action, el[SDOM_DATA].model);
   if (next === el[SDOM_DATA].model) return;
-  actuate({ el, model }, next, sdom);
+  sdom({ el, model: el[SDOM_DATA].model }, next);
   console.log('action', action);
   console.log('prev.model', el[SDOM_DATA].model);
   console.log('next', next);
@@ -128,13 +153,15 @@ function handleAction(action: Action) {
 let model: Model = { filter: 'all', todos: [], title: '' };
 const container = document.createElement('div');
 document.body.appendChild(container);
-const sdom = view.map(handleAction)
-const el = actuate(null, model, sdom);
+const sdom = dimap(id, handleAction)(view as any)
+const el = sdom(null, model);
 el[SDOM_DATA] = el[SDOM_DATA] || {};
 el[SDOM_DATA].model = model;
+
 window.onpopstate = function(event) {
   handleAction({ tag: 'HashChange', hash: location.hash });
 };
-container.appendChild(el);
+container.appendChild(unpack(el));
 
 const KEY_ENTER = 13;
+
