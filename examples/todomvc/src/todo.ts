@@ -1,16 +1,22 @@
-import { h, SDOM, text } from '../../../src';
-import { Props } from '../../../src/props';
+import { text, H } from '../../../src';
+import create from '../../../src';
+
+const h = create<Props, Action>();
 
 // Model
 export type Model = {
   title: string;
   completed: boolean;
   editing: string|null;
-  hidden: boolean;
 };
 
+// Props
+export type Props = Model & {
+  hidden: boolean;
+}
+
 // Init
-export function init(title: string): Omit<Model, 'hidden'> {
+export function init(title: string): Model {
   return { title, completed: false, editing: null };
 }
 
@@ -18,7 +24,7 @@ export function init(title: string): Omit<Model, 'hidden'> {
 export type Action =
   | { tag: 'Completed' }
   | { tag: 'Destroy' }
-  | { tag: 'Editing/on', event: Event }
+  | { tag: 'Editing/on', event: MouseEvent }
   | { tag: 'Editing/input', value: string }
   | { tag: 'Editing/cancel' }
   | { tag: 'Editing/commit' }
@@ -43,8 +49,8 @@ export function update(action: Action, model: ReturnType<typeof init>): ReturnTy
   }
 }
 
-const rootClass = (m: Model) => [m.completed ? 'completed' : '', m.editing !== null ? 'editing' : ''].filter(Boolean).join(' ');
-const rootStyle = (m: Model) => m.hidden ? 'display: none;' : '';
+const rootClass = (m: Props) => [m.completed ? 'completed' : '', m.editing !== null ? 'editing' : ''].filter(Boolean).join(' ');
+const rootStyle = (m: Props) => m.hidden ? 'display: none;' : '';
 
 // View
 export const view = h.li(
@@ -56,23 +62,23 @@ export const view = h.li(
     h.input({
       className: 'toggle',
       type: 'checkbox',
-      checked: (m: Model) => m.completed,
+      checked: m => m.completed,
       onclick: () => ({ tag: 'Completed' }),
     }),
     
-    h.label(text((m: Model) => m.title)),
+    h.label(text(m => m.title)),
     
     h.button({ className: 'destroy', onclick: () => ({ tag: 'Destroy' }) }),
   ),
   
-  h.input<Model, Action>({
+  h.input({
     className: 'edit',
-    value: (m: Model) => m.editing !== null ? m.editing : m.title,
-    oninput: e => ({ tag: 'Editing/input', value: e['target']!['value'] }),
+    value: m => m.editing !== null ? m.editing : m.title,
+    oninput: e => ({ tag: 'Editing/input', value: e.currentTarget.value }),
     onblur: () => ({ tag: 'Editing/commit' }),
     onkeydown: handleKeydown,
   }),
-) as SDOM<Model, Action>;
+);
 
 function handleKeydown(event: KeyboardEvent): Action|void {
   if (event.keyCode === KEY_ENTER) return { tag: 'Editing/commit' };

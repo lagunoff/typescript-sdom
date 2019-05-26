@@ -1,12 +1,15 @@
-import { h, array, SDOM_DATA, text, dimap, id, unpack, SDOM } from '../../../src';
+import { SDOM_DATA, id, unpack, attach } from '../../../src';
+import create from '../../../src';
 import * as todo from './todo';
 import { Prop } from '../../../src/props';
 import css from './css';
 
+const h = create<Model, Action>();
+
 // Model
 export type Model = {
   title: string;
-  todos: ReturnType<typeof todo.init>[];
+  todos: todo.Model[];
   filter: Filter;
 };
 
@@ -64,7 +67,7 @@ export function update(action: Action, model: Model): Model {
 }
 
 // View
-export const view: SDOM<Model, Action> = h.div(
+export const view = h.div(
   h.section(
     { className: 'todoapp' },
     
@@ -75,9 +78,9 @@ export const view: SDOM<Model, Action> = h.div(
         className: 'new-todo',
         placeholder: 'What needs to be done?',
         autofocus: true,
-        value: (m: Model) => m.title,
-        oninput: e => ({ tag: 'Input', value: e.target.value } as Action),
-        onkeydown: event => ({ tag: 'KeyDown', event } as Action),
+        value: m => m.title,
+        oninput: e => ({ tag: 'Input', value: e.currentTarget.value }),
+        onkeydown: event => ({ tag: 'KeyDown', event }),
       }),
     ),
 
@@ -93,15 +96,15 @@ export const view: SDOM<Model, Action> = h.div(
       
       h.label('Mark all as complete', { for: 'toggle-all' }),
 
-      dimap(id, a => ({ tag: '@Todo', ...a }))(
-        // @ts-ignore
-        array('todos','ul', { className: 'todo-list' }, dimap(m => ({ ...m.item, hidden: !(m.model.filter === 'all' || (m.model.filter === 'completed' && m.item.completed) || (m.model.filter === 'active' && !m.item.completed)) }), id)(todo.view)),
-      ),
+      h.array(m => m.todos, 'ul', { className: 'todo-list' }, h => h.dimap<todo.Props, todo.Action>(
+        m => ({ ...m.item, hidden: !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.item.completed) || (m.parent.filter === 'active' && !m.item.completed)) }),
+        action => idx => ({ tag: '@Todo' as '@Todo', action, idx })
+      )(todo.view)),
       
       h.footer(
         { className: 'footer' },
         
-        h.span({ className: 'todo-count'}, h('strong', text(countItemsLeft)), ' items left'),
+        h.span({ className: 'todo-count'}, h('strong', h.text(countItemsLeft)), ' items left'),
         
         h.ul(
           { className: 'filters' },
@@ -139,30 +142,23 @@ function selectedIf(filter: Filter): Prop<Model, string> {
 }
  
 function handleAction(action: Action) {
-  const next = update(action, el[SDOM_DATA].model);
-  if (next === el[SDOM_DATA].model) return;
-  sdom({ el, model: el[SDOM_DATA].model }, next);
+  const next = update(action, inst.currentModel);
+  if (next === inst.currentModel) return;
+  inst.stepper(next);
   console.log('action', action);
-  console.log('prev.model', el[SDOM_DATA].model);
   console.log('next', next);
   console.log('-----------');
-  el[SDOM_DATA].model = next;
 }
 
 
-let model: Model = { filter: 'all', todos: [], title: '' };
+const init: Model = { filter: 'all', todos: [], title: '' };
 const container = document.createElement('div');
 document.body.appendChild(container);
-const sdom = dimap(id, handleAction)(view as any)
-const el = sdom(null, model);
-el[SDOM_DATA] = el[SDOM_DATA] || {};
-el[SDOM_DATA].model = model;
+const inst = attach(view, container, init, handleAction);
+
 
 window.onpopstate = function(event) {
   handleAction({ tag: 'HashChange', hash: location.hash });
 };
-container.appendChild(unpack(el));
 
 const KEY_ENTER = 13;
-
-HTMLInputElement
