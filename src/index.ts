@@ -212,9 +212,16 @@ export type Prev<Model, Action> = { el: SDOMElement<Model, Action>, model: Model
 
 export type Many<T> = T|T[];
 
+
+type PropsOrChilds<Model, Action> = Props<any, any>|SDOM<any, any>|string|number|null|undefined;
+type InferModel<T> = T extends PropsOrChilds<infer Model, any> ? Model : {};
+type InferAction<T> = T extends PropsOrChilds<any, infer Action> ? Action : never;
+
+  
+
 export namespace h {
   export type BoundH = {
-      <Model, Action>(...rest: Array<Props<Model, Action>|SDOM<Model, Action>|string|number>): SDOM<Model, Action>;
+      <Rest extends PropsOrChilds<any, any>[]>(...rest: Rest): SDOM<InferModel<Rest[number]>, InferAction<Rest[number]>>;
   };
   
   export const div = h.bind(void 0, 'div') as BoundH;

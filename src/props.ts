@@ -1,5 +1,5 @@
 export type Prop<Model, T> = T|((m: Model) => T);
-export type EventProp<Model, Action> = (e: Event, m: Model) => Action|void;
+export type EventProp<Model, Action, Ev = Event> = (e: Ev, m: Model) => Action|void;
 
 export type Props<Model, Action> = {
   className?: Prop<Model, string>;  style?: Prop<Model, string>;  classList?: Record<string, boolean|((m: Model) => boolean)>
@@ -81,12 +81,16 @@ export type Props<Model, Action> = {
   checked?: Prop<Model, boolean>;
   autofocus?: Prop<Model, boolean>;  ondblclick?: EventProp<Model, Action>;
   onclick?: EventProp<Model, Action>;
-  onblur?: EventProp<Model, Action>;
   onfocus?: EventProp<Model, Action>;
-  oninput?: EventProp<Model, Action>;
-  onkeydown?: EventProp<Model, Action>;
+  oninput?: EventProp<Model, Action, Omit<Event, 'target'> & { target: HTMLInputElement }>;
+  onblur?: EventProp<Model, Action, Omit<Event, 'target'> & { target: HTMLInputElement }>;
+  onkeydown?: EventProp<Model, Action, HTMLElementEventMap['keydown']>;
+  onkeyup?: EventProp<Model, Action, HTMLElementEventMap['keyup']>;
+  onkeypress?: EventProp<Model, Action, HTMLElementEventMap['keypress']>;
 };
 
 export const attributes = {
   for: '',
 };
+
+export type Omit<T, U extends keyof T> = { [K in Exclude<keyof T, U>]: T[K] };

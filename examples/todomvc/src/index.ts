@@ -1,4 +1,4 @@
-import { h, array, SDOM_DATA, text, dimap, id, unpack } from '../../../src';
+import { h, array, SDOM_DATA, text, dimap, id, unpack, SDOM } from '../../../src';
 import * as todo from './todo';
 import { Prop } from '../../../src/props';
 import css from './css';
@@ -15,7 +15,7 @@ export type Filter = 'all'|'active'|'completed';
 
 // Action
 export type Action =
-  | { tag: 'Edit', value: string }
+  | { tag: 'Input', value: string }
   | { tag: 'ToggleAll' }
   | { tag: 'ClearCompleted' }
   | { tag: 'KeyDown', event: KeyboardEvent }
@@ -25,7 +25,7 @@ export type Action =
 // Update
 export function update(action: Action, model: Model): Model {
   switch (action.tag) {
-    case 'Edit': return { ...model, title: action.value };
+    case 'Input': return { ...model, title: action.value };
     case 'ToggleAll': {
       const checked = allChecked(model);
       const todos = model.todos.map(t => ({ ...t, completed: !checked }));
@@ -64,7 +64,7 @@ export function update(action: Action, model: Model): Model {
 }
 
 // View
-export const view = h.div(
+export const view: SDOM<Model, Action> = h.div(
   h.section(
     { className: 'todoapp' },
     
@@ -76,7 +76,7 @@ export const view = h.div(
         placeholder: 'What needs to be done?',
         autofocus: true,
         value: (m: Model) => m.title,
-        oninput: e => ({ tag: 'Edit', value: e['target']!['value'] } as Action),
+        oninput: e => ({ tag: 'Input', value: e.target.value } as Action),
         onkeydown: event => ({ tag: 'KeyDown', event } as Action),
       }),
     ),
@@ -165,3 +165,4 @@ container.appendChild(unpack(el));
 
 const KEY_ENTER = 13;
 
+HTMLInputElement

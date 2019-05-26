@@ -1,4 +1,5 @@
 import { h, SDOM, text } from '../../../src';
+import { Props } from '../../../src/props';
 
 // Model
 export type Model = {
