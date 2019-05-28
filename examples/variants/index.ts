@@ -1,4 +1,4 @@
-import { createVariant, Variant } from './variant';
+import { variantConstructor, Variant } from './variant';
 import create, { SDOM, discriminate, id, SDOM_DATA, NestedModel, H, dimap } from '../../src';
 
 const h = create<Model, Action>();
@@ -8,39 +8,32 @@ export type Model = {
   tabs: Tabs;
 };
 
-export type Action2 = Variant<{
+export const Action = variantConstructor<Action>();
+export type Action = Variant<{
   Close: {};
   Tab: { tab: Tabs };
 }>;
 
-export type Action =
-  | { tag: 'Close' }
-  | { tag: 'Tab', tab: Tabs }
-;
+export const Tabs = variantConstructor<Tabs>();
+export type Tabs = Variant<{
+  Info: { info: string };
+  Comments: { comments: string[] };
+}>;
 
 
-export type Modal = typeof Modal._A;
-export const Modal = createVariant({
-  None: {},
-  ConfirmAction: (p: { action: Action }) => p,
-});
-
-export type Tabs = typeof Tabs._A;
-export const Tabs = createVariant({
-  Info: (p: { info: string }) => p,
-  Comments: (p: { comments: string[] }) => p,
-});
+export const Modal = variantConstructor<Modal>();
+export type Modal = Variant<{
+  None: {};
+  Comments: { comments: string[] };
+}>;
 
 
-export type Tab = 
-  | { tag: 'Info', info: string }
-  | { tag: 'Comments', comments: string[] }
+const s01 = Action('Tab', { tab: Tabs('Info', { info: '' }) });
 
-const s01: Action = { tag: 'Tab', tab: Tabs.Info({ info: '' }) };
 
 export const view = h.div(
   h.ul(
-    ...Object.keys(Tabs).map(k => h.li(k))
+    ...['Info', 'Comments'].map(k => h.li(k))
   ),
   
   variant(m => m.tabs, {
@@ -49,7 +42,7 @@ export const view = h.div(
     ),
     
     Comments: h => h.div(
-      h.array(m => m.item.comments, 'ul', {}, h => h.li(h.text(m => m.item)))
+      h.array('ul')(m => m.item.comments, h => h.li(h.text(m => m.item)))
     ),
   }),
 );
@@ -58,7 +51,7 @@ function handleAction(action: Action) {
   return action;
 }
 
-let model: Model = { tabs: Tabs.Info({ info: 'isdhfsdjfhsdjfh' }), modal: Modal.None };
+let model: Model = { tabs: Tabs('Info', { info: 'isdhfsdjfhsdjfh' }), modal: Modal('None', {}) };
 const container = document.createElement('div');
 document.body.appendChild(container);
 const sdom = h.dimap(id, handleAction)(view as any)
@@ -79,5 +72,3 @@ export function variant<Model, Action, T>(discriminator: (m: Model) => Variant<T
 export type VariantFn<T, Model, Action> = {
   [K in keyof T]: (h: H<NestedModel<Model, T[K]>, (k: K) => Action>) => SDOM<NestedModel<Model, T[K]>, (k: K) => Action>;
 };
-
-export type VariantOf<T> = T extends Variant<infer A> ? A : never;

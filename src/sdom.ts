@@ -38,8 +38,9 @@ export function attach<Model, Action>(view: SDOM<Model, Action>, rootEl: HTMLEle
   rootEl.appendChild(el);
   const prev: Prev<Model, any> = { el, model };
   const inst: SDOMInstance<Model, Action> = { rootEl, prev, currentModel: model, sdom, stepper() {} };
-  // STEPPER
-  var rAF =
+  
+  // Borrowed from ELM
+  const rAF =
     typeof requestAnimationFrame !== 'undefined'
     ? requestAnimationFrame
     : function(callback) { setTimeout(callback, 1000 / 60); };  
@@ -74,8 +75,8 @@ export function attach<Model, Action>(view: SDOM<Model, Action>, rootEl: HTMLEle
     }
 
     return function stepper(model) {
-      if (state === 'NO_REQUEST')
-      {
+      if (instance.currentModel === model) return;
+      if (state === 'NO_REQUEST') {
 	rAF(updateIfNeeded);
       }
       state = 'PENDING_REQUEST';
@@ -181,13 +182,13 @@ export function text<Model, Action>(value: string|number|((m: Model) => string|n
 export type NestedModel<Parent, Child> = { parent: Parent, item: Child };
 
 
-export function array<Model, Action, T extends any[]>(discriminator: (m: Model) => T, name: string, props: Props<Model, Action>, child: (h: H<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<NestedModel<Model, T[number]>, (idx: number) => Action>): SDOM<Model, Action> {
-  return (prev, next) => {
+export function array<Model, Action>(name: string, props: Props<Model, Action> = {}): <T extends any[]>(selector: (m: Model) => T, child: (h: H<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<Model, Action> {
+  return (selector, child) => (prev, next) => {
     if (prev && !next) {
       // Destroy node
       const { el } = prev;
       const parent = prev.model;
-      const xs = discriminator(parent);
+      const xs = selector(parent);
       const data = nodeData(el);
       if (!(el instanceof HTMLElement)) throw new Error('actuate: got invalid DOM node');
       data && data.unlisten && data.unlisten();
@@ -198,14 +199,14 @@ export function array<Model, Action, T extends any[]>(discriminator: (m: Model) 
       return prev.el;      
     } else if (!prev && next) {
       // Create new DOM node
-      const xs = discriminator(next);
+      const xs = selector(next);
       const el = elem(name, props)(null, next);
       xs.forEach((item, idx) => {
         const childEl = child(h as any)(null, { item, parent: next });
         childEl[SDOM_DATA] = childEl[SDOM_DATA] || {};
         const { coproj, proj } = childEl[SDOM_DATA];
         childEl[SDOM_DATA].coproj = parent => {
-          const item = discriminator(parent)[idx];
+          const item = selector(parent)[idx];
           parent = { parent, item };
           return coproj ? coproj(parent) : parent;
         };
@@ -219,8 +220,8 @@ export function array<Model, Action, T extends any[]>(discriminator: (m: Model) 
     } else if (prev && next) {
       // Update existing DOM node
       const { el } = prev;
-      const xs = discriminator(next);
-      const xsPrev = discriminator(prev.model);
+      const xs = selector(next);
+      const xsPrev = selector(prev.model);
       let lastInserted: SDOMElement<any,any, any>|null = null;
       for (let i =  Math.max(xs.length, xsPrev.length) - 1; i >= 0; i--) {
         const childEl = el.childNodes[i] as any as SDOMElement<any, any, any>;
@@ -231,7 +232,7 @@ export function array<Model, Action, T extends any[]>(discriminator: (m: Model) 
           nextEl[SDOM_DATA] = nextEl[SDOM_DATA] || {};
           const { coproj, proj } = nextEl[SDOM_DATA];
           nextEl[SDOM_DATA].coproj = parent => {
-            const item = discriminator(parent)[i];
+            const item = selector(parent)[i];
             parent = { parent, item };
             return coproj ? coproj(parent) : parent;
           };
@@ -257,7 +258,6 @@ export function array<Model, Action, T extends any[]>(discriminator: (m: Model) 
     throw new Error('next and prev cannot be both null simultaneously');    
   }
 }
-
 
 export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: SDOM<M1, A1>) => SDOM<M2, A2> {
   return sdom => (prev, next) => {
@@ -356,7 +356,7 @@ declare module "./index" {
   export interface H<Model, Action> {
     (name: string, ...rest: Array<Props<Model, Action>|SDOM<Model, Action>|string|number>): SDOM<Model, Action, HTMLElement>;
     text(content: string|number|((m: Model) => string|number)): SDOM<Model, Action, Text>;
-    array<T extends any[]>(discriminator: (m: Model) => T, name: string, props: Props<Model, Action>, child: (h: H<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<NestedModel<Model, T[number]>, (idx: number) => Action>): SDOM<Model, Action>;
+    array(name: string, props?: Props<Model, Action>): <T extends any[]>(selector: (m: Model) => T, child: (h: H<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<Model, Action>;
     discriminate<K extends string>(discriminator: (m: Model) => K, variants: Record<K, SDOM<Model, Action>>): SDOM<Model, Action>;
     dimap<M1, A1>(coproj: (m: Model) => M1, proj: (m: A1) => Action): (s: SDOM<M1, A1>) => SDOM<Model, Action>;
   }

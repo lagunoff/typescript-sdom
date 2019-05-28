@@ -1,4 +1,4 @@
-import { SDOM_DATA, id, unpack, attach } from '../../../src';
+import { SDOM_DATA, id, unpack, attach, NestedModel } from '../../../src';
 import create from '../../../src';
 import * as todo from './todo';
 import { Prop } from '../../../src/props';
@@ -21,7 +21,7 @@ export type Action =
   | { tag: 'Input', value: string }
   | { tag: 'ToggleAll' }
   | { tag: 'ClearCompleted' }
-  | { tag: 'KeyDown', event: KeyboardEvent }
+  | { tag: 'KeyDown/enter' }
   | { tag: 'HashChange', hash: string }
   | { tag: '@Todo', idx: number, action: todo.Action }
 
@@ -38,8 +38,8 @@ export function update(action: Action, model: Model): Model {
       const todos = model.todos.filter(t => !t.completed);
       return { ...model, todos };
     }
-    case 'KeyDown': {
-      if (action.event.keyCode === KEY_ENTER && model.title) {
+    case 'KeyDown/enter': {
+      if (model.title) {
         const todos = [...model.todos, todo.init(model.title)];
         return { ...model, title: '', todos };
       }
@@ -73,19 +73,22 @@ export const view = h.div(
     
     h.header(
       { className: 'header' },
+      
       h.h1('Todos'),
+      
       h.input({
         className: 'new-todo',
         placeholder: 'What needs to be done?',
         autofocus: true,
         value: m => m.title,
         oninput: e => ({ tag: 'Input', value: e.currentTarget.value }),
-        onkeydown: event => ({ tag: 'KeyDown', event }),
+        onkeydown: e => e.keyCode === KEY_ENTER ? { tag: 'KeyDown/enter' } : void 0,
       }),
     ),
 
     h.section(
       { className: 'main' },
+      
       h.input({
         id: 'toggle-all',
         className: 'toggle-all',
@@ -96,10 +99,13 @@ export const view = h.div(
       
       h.label('Mark all as complete', { for: 'toggle-all' }),
 
-      h.array(m => m.todos, 'ul', { className: 'todo-list' }, h => h.dimap<todo.Props, todo.Action>(
-        m => ({ ...m.item, hidden: !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.item.completed) || (m.parent.filter === 'active' && !m.item.completed)) }),
-        action => idx => ({ tag: '@Todo' as '@Todo', action, idx })
-      )(todo.view)),
+      h.array('ul', { className: 'todo-list' })(
+        m => m.todos,
+        h => h.dimap<todo.Props, todo.Action>(
+          todoSelector,
+          action => idx => ({ tag: '@Todo', action, idx })
+        )(todo.view)
+      ),
       
       h.footer(
         { className: 'footer' },
@@ -140,25 +146,24 @@ function allChecked(model: Model): boolean {
 function selectedIf(filter: Filter): Prop<Model, string> {
   return m => m.filter === filter ? 'selected' : '';
 }
- 
-function handleAction(action: Action) {
+
+function todoSelector(m: NestedModel<Model, todo.Model>): todo.Props {
+  return { ...m.item, hidden: !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.item.completed) || (m.parent.filter === 'active' && !m.item.completed)) };
+}
+
+function dispatch(action: Action) {
   const next = update(action, inst.currentModel);
-  if (next === inst.currentModel) return;
   inst.stepper(next);
   console.log('action', action);
   console.log('next', next);
   console.log('-----------');
 }
 
-
 const init: Model = { filter: 'all', todos: [], title: '' };
-const container = document.createElement('div');
-document.body.appendChild(container);
-const inst = attach(view, container, init, handleAction);
-
+const inst = attach(view, document.body, init, dispatch);
 
 window.onpopstate = function(event) {
-  handleAction({ tag: 'HashChange', hash: location.hash });
+  dispatch({ tag: 'HashChange', hash: location.hash });
 };
 
 const KEY_ENTER = 13;

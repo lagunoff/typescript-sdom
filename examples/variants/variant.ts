@@ -5,23 +5,16 @@
 
 const variantSymbol = Symbol('Variant');
 export type Variant<T> = { [K in keyof T]: { tag: K } & T[K] }[keyof T] & { [variantSymbol]: T };
+export type VariantOf<T> = T extends Variant<infer A> ? A : never;
 
 // Variant constructor
 export function variant<T, K extends keyof T>(key: K, value: T[K]): Variant<T> { 
     return [key, value] as any;
 }
 
-export function createVariant<C extends Record<string, {} | ((...a) => any)>>(constructors: C): { [K in keyof C]: C[K] extends ((...a) => infer P) ? ((p: P) => InferVariant<C>) : InferVariant<C> } & { _A: InferVariant<C> } {
-  for (const k in constructors) {
-    // @ts-ignore
-    constructors[k] = typeof(constructors[k]) === 'object' ? variant(k, constructors[k]) as any : v => variant(k, v);
-  }
-  return constructors as any;
+export function variantConstructor<V extends Variant<any>>(): <K extends keyof VariantOf<V>>(key: K, value: VariantOf<V>[K]) => V {
+  return variant as any;
 }
-
-type InferVariant<C extends Record<string, {} | ((...a) => any)>> = Variant<{
-  [K in keyof C]: C[K] extends ((...a) => infer P) ? P : {};
-}>;
 
 // Pattern-match on `Variant<T>`
 export function match<T>(v: Variant<T>): MatchFn<T> {
