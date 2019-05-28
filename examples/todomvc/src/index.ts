@@ -46,9 +46,8 @@ export function update(action: Action, model: Model): Model {
       return model;
     }
     case 'HashChange': {
-      if (action.hash === '#/completed') return { ...model, filter: 'completed' };
-      if (action.hash === '#/active') return { ...model, filter: 'active' };
-      return { ...model, filter: 'all' };
+      const filter = filterFromHash(action.hash);
+      return { ...model, filter };
     }
     case '@Todo': {
       if (action.action.tag === 'Destroy') {
@@ -151,6 +150,12 @@ function todoSelector(m: NestedModel<Model, todo.Model>): todo.Props {
   return { ...m.item, hidden: !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.item.completed) || (m.parent.filter === 'active' && !m.item.completed)) };
 }
 
+function filterFromHash(hash: string): Filter {
+  if (hash === '#/completed') return 'completed';
+  if (hash === '#/active') return 'active';
+  return 'all';
+}
+
 function dispatch(action: Action) {
   const next = update(action, inst.currentModel);
   inst.stepper(next);
@@ -159,11 +164,18 @@ function dispatch(action: Action) {
   console.log('-----------');
 }
 
-const init: Model = { filter: 'all', todos: [], title: '' };
+const storedTodos = localStorage.getItem('todomvc-typescript-sdom');
+const todos: todo.Model[] = storedTodos ? JSON.parse(storedTodos) : [];
+const filter = filterFromHash(location.hash);
+const init: Model = { title: '', filter, todos };
 const inst = attach(view, document.body, init, dispatch);
 
-window.onpopstate = function(event) {
+window.onpopstate = function() {
   dispatch({ tag: 'HashChange', hash: location.hash });
+};
+
+window.onbeforeunload = function() {
+  localStorage.setItem('todomvc-typescript-sdom', JSON.stringify(inst.currentModel.todos));
 };
 
 const KEY_ENTER = 13;
