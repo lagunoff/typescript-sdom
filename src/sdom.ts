@@ -5,7 +5,7 @@ const sdomSymbol = Symbol('SDOM');
 export type SDOM<Model, Action, Elem extends Node = Node> = Derivative<Model, SDOMNode<Model, Action, Elem>>;
 export type Prev<Input, Output> = { input: Input, output: Output };
 export type Derivative<Input, Output> = {
-  (prev: Prev<Input, Output>|null, next: Input|null): Output;
+  (prev: Prev<Input, Output>|null, next: Input): Output;
   (prev: Prev<Input, Output>, next: null): Output;
 };
 
@@ -186,7 +186,7 @@ export function array<Model, Action>(name: string, props: Props<Model, Action> =
         const childEl = el.childNodes[i] as any;
         const childPrev = i in xsPrev ? { output: childEl, input: { parent: next, here: xsPrev[i] } } : null;
         const childNext = i in xs ? { parent: next, here: xs[i] } : null;
-        const nextEl = child(h as any)(childPrev, childNext);
+        const nextEl = child(h as any)(childPrev, childNext!);
         if (nextEl !== childEl) {
           nextEl[SDOM_DATA] = nextEl[SDOM_DATA] || {};
           const { coproj, proj } = nextEl[SDOM_DATA];
@@ -224,7 +224,7 @@ export function array<Model, Action>(name: string, props: Props<Model, Action> =
 export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: SDOM<M1, A1>) => SDOM<M2, A2> {
   return sdom => (prev, next) => {
     const chPrev = prev ? { output: prev.output as any, input: coproj(prev.input) } : null;
-    const nextEl = sdom(chPrev, next ? coproj(next) : null);
+    const nextEl = sdom(chPrev, next ? coproj(next) : null!);
     if (!prev || nextEl !== prev.output as any) {
       nextEl[SDOM_DATA] = nextEl[SDOM_DATA] || {};
       const { coproj: coproj_, proj: proj_ } = nextEl[SDOM_DATA];
