@@ -1,4 +1,4 @@
-import { SDOM_DATA, id, unpack, attach, NestedModel } from '../../../src';
+import { attach, Nested } from '../../../src';
 import create from '../../../src';
 import * as todo from './todo';
 import { Prop } from '../../../src/props';
@@ -22,7 +22,7 @@ export type Action =
   | { tag: 'ToggleAll' }
   | { tag: 'ClearCompleted' }
   | { tag: 'KeyDown/enter' }
-  | { tag: 'HashChange', hash: string }
+  | { tag: 'Hash/change', hash: string }
   | { tag: '@Todo', idx: number, action: todo.Action }
 
 // Update
@@ -45,7 +45,7 @@ export function update(action: Action, model: Model): Model {
       }
       return model;
     }
-    case 'HashChange': {
+    case 'Hash/change': {
       const filter = filterFromHash(action.hash);
       return { ...model, filter };
     }
@@ -146,8 +146,8 @@ function selectedIf(filter: Filter): Prop<Model, string> {
   return m => m.filter === filter ? 'selected' : '';
 }
 
-function todoSelector(m: NestedModel<Model, todo.Model>): todo.Props {
-  return { ...m.item, hidden: !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.item.completed) || (m.parent.filter === 'active' && !m.item.completed)) };
+function todoSelector(m: Nested<Model, todo.Model>): todo.Props {
+  return { ...m.here, hidden: !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.here.completed) || (m.parent.filter === 'active' && !m.here.completed)) };
 }
 
 function filterFromHash(hash: string): Filter {
@@ -164,17 +164,17 @@ function dispatch(action: Action) {
   console.log('-----------');
 }
 
-const storedTodos = localStorage.getItem('todomvc-typescript-sdom');
-const todos: todo.Model[] = storedTodos ? JSON.parse(storedTodos) : [];
+const todosJson = localStorage.getItem('todomvc-typescript-sdom');
+const todos: todo.Model[] = todosJson ? JSON.parse(todosJson) : [];
 const filter = filterFromHash(location.hash);
 const init: Model = { title: '', filter, todos };
 const inst = attach(view, document.body, init, dispatch);
 
-window.onpopstate = function() {
-  dispatch({ tag: 'HashChange', hash: location.hash });
+window.onpopstate = () => {
+  dispatch({ tag: 'Hash/change', hash: location.hash });
 };
 
-window.onbeforeunload = function() {
+window.onbeforeunload = () => {
   localStorage.setItem('todomvc-typescript-sdom', JSON.stringify(inst.currentModel.todos));
 };
 

@@ -10,7 +10,8 @@ export type Model = {
   editing: string|null;
 };
 
-// Props
+// Extra fields to `Model` provided by parent component. Much like
+// props in ReactJS https://github.com/lagunoff/typescript-sdom/blob/fc943d5ff5297cbf64977f1e20275bf1d438a406/examples/todomvc/src/index.ts#L150
 export type Props = Model & {
   hidden: boolean;
 }

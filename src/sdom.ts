@@ -1,92 +1,46 @@
-import { Props, attributes, Omit } from './props'
+import { Props, attributes } from './props'
 import { h, H } from './index';
 
-export const SDOM_DATA = '__SDOM_DATA__';
-export type SDOMData<Model, Action> = {
-  proj?(action: unknown): Action;
-  coproj?(model: Model): unknown;
-  model?: Model;
-  unlisten?: Function;
-};
-
 const sdomSymbol = Symbol('SDOM');
-export type SDOM<Model, Msg, UI extends Node = Node> = Derivative<Model, UI & { [sdomSymbol]: [Model, Msg] }>;
-export type Prev<Arg, Result> = { model: Arg, el: Result };
-export type Derivative<Input, Output> = (prev: Prev<Input, Output>|null, next: Input|null) => Output;
-
-
-// An opaque alias for HTMLElement|Text to distinguish the DOM nodes
-// created by typescript-sdom
-export type SDOMElement<Model, Action, Elem> = Elem & { [sdomSymbol]: [Model, Action] };
-
-
-// SDOMInstance
-export type SDOMInstance<Model, Action> = {
-  rootEl: HTMLElement;
-  currentModel: Model;
-  prev: Prev<Model, any>;
-  sdom: SDOM<Model, Action>;
-  stepper(next: Model): void;
+export type SDOM<Model, Action, Elem extends Node = Node> = Derivative<Model, SDOMNode<Model, Action, Elem>>;
+export type Prev<Input, Output> = { input: Input, output: Output };
+export type Derivative<Input, Output> = {
+  (prev: Prev<Input, Output>|null, next: Input|null): Output;
+  (prev: Prev<Input, Output>, next: null): Output;
 };
 
-// Attach `SDOM` to the real DOM node
-export function attach<Model, Action>(view: SDOM<Model, Action>, rootEl: HTMLElement, model: Model, sink: (a: Action) => void): SDOMInstance<Model, Action> {
+// An opaque alias for `Elem` to distinguish the DOM nodes created by
+// this library
+export type SDOMNode<Model, Action, Elem> = Elem & { [sdomSymbol]: [Model, Action] };
+
+/**
+ * Start the application and attach it to `rootEl`
+ * ```ts
+ * const view = h.div(h.h1('Hello world!', { id: 'greeting' }));
+ * const inst = attach(view, document.body, {});
+ * document.getElementById('greeting').textContent; // => 'Hello world!'
+ * ```
+ */
+export function attach<Model, Action>(view: SDOM<Model, Action>, rootEl: HTMLElement, model: Model, sink: (a: Action) => void = noop): SDOMInstance<Model, Action> {
   const sdom = dimap(id, (a: Action) => (sink(a), a))(view);
   const el = sdom(null, model);
   rootEl[SDOM_DATA] = rootEl[SDOM_DATA] || {};
   rootEl[SDOM_DATA].model = model;
   rootEl.appendChild(el);
-  const prev: Prev<Model, any> = { el, model };
-  const inst: SDOMInstance<Model, Action> = { rootEl, prev, currentModel: model, sdom, stepper() {} };
-  
-  // Borrowed from ELM
-  const rAF =
-    typeof requestAnimationFrame !== 'undefined'
-    ? requestAnimationFrame
-    : function(callback) { setTimeout(callback, 1000 / 60); };  
-  inst.stepper = makeStepper(inst);
-  return inst;
+  const prev: Prev<Model, typeof el> = { output: el, input: model };
 
-  function makeStepper(instance: Omit<SDOMInstance<Model, Action>, 'stepper'>){
-    var state = 'NO_REQUEST';
-    function updateIfNeeded() {
-      switch (state) {
-	case 'NO_REQUEST':
-	  throw new Error(
-	    'Unexpected draw callback.\n' +
-	      'Please report this to <https://github.com/elm-lang/virtual-dom/issues>.'
-	  );
-
-	case 'PENDING_REQUEST':
-	  rAF(updateIfNeeded);
-	  state = 'EXTRA_REQUEST';
-          const nextEl = instance.sdom(instance.prev, instance.currentModel);
-          if (nextEl !== instance.prev.el) {
-            instance.rootEl.removeChild(instance.prev.el);
-            instance.rootEl.appendChild(nextEl);
-          }
-          instance.prev = { el: nextEl, model: instance.currentModel };
-	  return;
-
-	case 'EXTRA_REQUEST':
-	  state = 'NO_REQUEST';
-	  return;
-      }
-    }
-
-    return function stepper(model) {
-      if (instance.currentModel === model) return;
-      if (state === 'NO_REQUEST') {
-	rAF(updateIfNeeded);
-      }
-      state = 'PENDING_REQUEST';
-      instance.currentModel = model;
-      rootEl[SDOM_DATA].model = instance.currentModel;
-    };
-  }  
+  return new SDOMInstance(rootEl, model, prev, sdom);
 }
 
-
+/**
+ * Create an html node
+ * ```ts
+ * const view = elem('a', { href: '#link' });
+ * const el = view(null, {});
+ * el instanceof HTMLAnchorElement; // => true
+ * el.href === '#link'; // => true
+ * ```
+ */
 export function elem<Model, Action>(name: string, ...rest: Array<Props<Model, Action>|SDOM<Model, Action>|string|number>): SDOM<Model, Action, HTMLElement> {
   const childs: SDOM<Model, Action, Node>[] = [];
   const attrs: Array<[string, string]> = [];
@@ -116,15 +70,15 @@ export function elem<Model, Action>(name: string, ...rest: Array<Props<Model, Ac
   return (prev, next) => {
     if (prev && !next) {
       // Destroy element
-      const { el } = prev;
-      const data = nodeData(el);
+      const el = prev.output;
+      const data = el[SDOM_DATA];
       if (!(el instanceof HTMLElement)) throw new Error('actuate: got invalid DOM node');
       data && data.unlisten && data.unlisten();
       childs.forEach((childSdom, idx) => {
         const ch = el.childNodes[idx] as any;
-        childSdom({ el: ch, model: prev.model }, null);
+        childSdom({ output: ch, input: prev.input }, null);
       });
-      return prev.el;
+      return prev.output;
     } else if (!prev && next) {
       // Create new element
       const el = document.createElement(name);
@@ -134,75 +88,80 @@ export function elem<Model, Action>(name: string, ...rest: Array<Props<Model, Ac
       dynamicAttrs.forEach(([k, fn]) => el.setAttribute(k, fn(next)));
       events.forEach(([k, listener]) => el.addEventListener(k, createEventListener(listener)));
       childs.forEach(ch => el.appendChild(ch(null, next)));
-      return pack(el);
+      return el;
     } else if (prev && next) {
       // Update existing element
-      const { el } = prev;
-      if (!(el instanceof HTMLElement)) throw new Error('actuate: got invalid DOM node');
-      dynamicProps.forEach(([k, fn]) => el[k] = fn(next));
-      dynamicAttrs.forEach(([k, fn]) => el.setAttribute(k, fn(next)));
+      const { output } = prev;
+      if (!(output instanceof HTMLElement)) throw new Error('actuate: got invalid DOM node');
+      dynamicProps.forEach(([k, fn]) => output[k] = fn(next));
+      dynamicAttrs.forEach(([k, fn]) => output.setAttribute(k, fn(next)));
       childs.forEach((childSdom, idx) => {
-        const ch = el.childNodes[idx] as any;
-        const nextCh = childSdom({ el: ch, model: prev.model }, next);
-        if (ch !== nextCh) el.replaceChild(nextCh, ch);
+        const ch = output.childNodes[idx] as any;
+        const nextCh = childSdom({ output: ch, input: prev.input }, next);
+        if (ch !== nextCh) output.replaceChild(nextCh, ch);
       });
-      return pack(el);
+      return output;
     }
     throw new Error('next and prev cannot be both null simultaneously');
   }
 }
 
+/**
+ * Create Text node
+ */
 export function text<Model, Action>(value: string|number|((m: Model) => string|number)): SDOM<Model, Action, Text> {
   return (prev, next) => {
     if (prev && !next) {
       // Destroy element
-      const { el } = prev;
-      return prev.el;
+      const { output } = prev;
+      return prev.output;
     } else if (!prev && next) {
       // Create new text node
       const text = typeof(value) === 'function' ? value(next) : value;
       const el = document.createTextNode(String(text));
-      return pack(el);      
+      return el as any;
     } else if (prev && next) {
       // Update existing text node
-      const { el } = prev;
+      const { output } = prev;
       if (typeof (value) === 'function') {
-        if (!(el instanceof Text)) throw new Error('actuate: got invalid DOM node');
+        if (!(output instanceof Text)) throw new Error('actuate: got invalid DOM node');
         const nextValue = value(next);
-        if (el.nodeValue !== nextValue) el.nodeValue = String(nextValue);
-        return el;
+        if (output.nodeValue !== nextValue) output.nodeValue = String(nextValue);
+        return output;
       }
       // Don't update static text
-      return el;
+      return output;
     }
     throw new Error('next and prev cannot be both null simultaneously');    
   }
 }
 
-export type NestedModel<Parent, Child> = { parent: Parent, item: Child };
+export type Nested<Parent, Child> = { parent: Parent, here: Child };
 
-
-export function array<Model, Action>(name: string, props: Props<Model, Action> = {}): <T extends any[]>(selector: (m: Model) => T, child: (h: H<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<Model, Action> {
+/**
+ * Create an html node which content is a dynamic list of child nodes
+ */
+export function array<Model, Action>(name: string, props: Props<Model, Action> = {}): <T extends any[]>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Model, Action> {
   return (selector, child) => (prev, next) => {
     if (prev && !next) {
       // Destroy node
-      const { el } = prev;
-      const parent = prev.model;
+      const { output } = prev;
+      const parent = prev.input;
       const xs = selector(parent);
-      const data = nodeData(el);
-      if (!(el instanceof HTMLElement)) throw new Error('actuate: got invalid DOM node');
+      const data = output[SDOM_DATA];
+      if (!(output instanceof HTMLElement)) throw new Error('actuate: got invalid DOM node');
       data && data.unlisten && data.unlisten();
-      xs.forEach((item, idx) => {
-        const ch = el.childNodes[idx] as any;
-        child(h as any)({ el: ch, model: { parent, item } }, null);
+      xs.forEach((here, idx) => {
+        const ch = output.childNodes[idx] as any;
+        child(h as any)({ output: ch, input: { parent, here } }, null);
       });
-      return prev.el;      
+      return prev.output;      
     } else if (!prev && next) {
       // Create new DOM node
       const xs = selector(next);
       const el = elem(name, props)(null, next);
-      xs.forEach((item, idx) => {
-        const childEl = child(h as any)(null, { item, parent: next });
+      xs.forEach((here, idx) => {
+        const childEl = child(h as any)(null, { here, parent: next });
         childEl[SDOM_DATA] = childEl[SDOM_DATA] || {};
         const { coproj, proj } = childEl[SDOM_DATA];
         childEl[SDOM_DATA].coproj = parent => {
@@ -219,14 +178,14 @@ export function array<Model, Action>(name: string, props: Props<Model, Action> =
       return el as any;
     } else if (prev && next) {
       // Update existing DOM node
-      const { el } = prev;
+      const el = prev.output;
       const xs = selector(next);
-      const xsPrev = selector(prev.model);
-      let lastInserted: SDOMElement<any,any, any>|null = null;
+      const xsPrev = selector(prev.input);
+      let lastInserted: Node|null = null;
       for (let i =  Math.max(xs.length, xsPrev.length) - 1; i >= 0; i--) {
-        const childEl = el.childNodes[i] as any as SDOMElement<any, any, any>;
-        const childPrev = i in xsPrev ? { el: childEl, model: { parent: next, item: xsPrev[i] } } : null;
-        const childNext = i in xs ? { parent: next, item: xs[i] } : null;
+        const childEl = el.childNodes[i] as any;
+        const childPrev = i in xsPrev ? { output: childEl, input: { parent: next, here: xsPrev[i] } } : null;
+        const childNext = i in xs ? { parent: next, here: xs[i] } : null;
         const nextEl = child(h as any)(childPrev, childNext);
         if (nextEl !== childEl) {
           nextEl[SDOM_DATA] = nextEl[SDOM_DATA] || {};
@@ -259,11 +218,14 @@ export function array<Model, Action>(name: string, props: Props<Model, Action> =
   }
 }
 
+/**
+ * Change both type parameters inside `SDOM<Model, Action>`.
+ */
 export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: SDOM<M1, A1>) => SDOM<M2, A2> {
   return sdom => (prev, next) => {
-    const chPrev = prev ? { el: prev.el as any, model: coproj(prev.model) } : null;
+    const chPrev = prev ? { output: prev.output as any, input: coproj(prev.input) } : null;
     const nextEl = sdom(chPrev, next ? coproj(next) : null);
-    if (!prev || nextEl !== prev.el as any) {
+    if (!prev || nextEl !== prev.output as any) {
       nextEl[SDOM_DATA] = nextEl[SDOM_DATA] || {};
       const { coproj: coproj_, proj: proj_ } = nextEl[SDOM_DATA];
       nextEl[SDOM_DATA].coproj = model => {
@@ -279,35 +241,37 @@ export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2
   };
 }
 
-
-export function discriminate<Model, Action, K extends string>(discriminator: (m: Model) => K, variants: Record<K, SDOM<Model, Action>>): SDOM<Model, Action> {
+/**
+ * Generic way to create `SDOM` which content is depends on some
+ * condition on `Model`. First parameter checks this condition and
+ * returns a key which points to the current `SDOM` inside `options`
+ */
+export function discriminate<Model, Action, K extends string>(discriminator: (m: Model) => K, options: Record<K, SDOM<Model, Action>>): SDOM<Model, Action> {
   return (prev, next) => {
     if (prev && !next) {
       // Destroy element
-      const { el } = prev;
-      return prev.el;
+      const key = discriminator(prev.input);
+      return options[key](prev, null);
     } else if (!prev && next) {
-      // Create new text node
-      return variants[discriminator(next)](prev, next);
+      // Create new node
+      const key = discriminator(next);
+      return options[key](prev, next);
     } else if (prev && next) {
       // Update existing text node
-      const { el } = prev;
-      const prevKey = discriminator(prev.model);
+      const prevKey = discriminator(prev.input);
       const nextKey = discriminator(next);
       if (prevKey !== nextKey) {
-        // Key is changed, so we don't update but create new node
-        return variants[discriminator(next)](null, next);
+        // Key is changed, so we don't update but switch to the new node
+        return options[nextKey](null, next);
       }
-      return variants[discriminator(next)](prev, next);
+      return options[nextKey](prev, next);
     }
     throw new Error('next and prev cannot be both null simultaneously');    
   };
 }
 
-
-export type Many<T> = T|T[];
-
-
+// Create an `Action` and then bubble it up the DOM tree applying all
+// the projections attached by `dimap`
 function createEventListener<Model, Action>(cb: (e: Event, model: Model) => Action|void): EventListener {
   return e => {
     let iter = e.target as HTMLElement|null;
@@ -337,26 +301,74 @@ function createEventListener<Model, Action>(cb: (e: Event, model: Model) => Acti
 }
 
 export const id = <A>(a: A) => a;
+export const noop = () => {};
 
+// Borrowed from ELM
+const rAF =
+  typeof requestAnimationFrame !== 'undefined'
+  ? requestAnimationFrame
+  : function(callback) { setTimeout(callback, 1000 / 60); };  
 
-export function pack<Model, Action, Elem>(el: Elem): SDOMElement<Model, Action, Elem> {
-  return el as any;
-}
- 
-export function unpack<Elem>(el: SDOMElement<any, any, Elem>): Elem {
-  return el as any;
-}
+// A running SDOM application
+export class SDOMInstance<Model, Action> {
+  private state: 'NO_REQUEST'|'PENDING_REQUEST'|'EXTRA_REQUEST' = 'NO_REQUEST';
+  
+  constructor (
+    readonly rootEl: HTMLElement,
+    public currentModel: Model,
+    private prev: Prev<Model, any>,
+    readonly sdom: SDOM<Model, Action>,
+  ){}
 
-export function nodeData<Model, Action>(el: SDOMElement<Model, Action, any>): SDOMData<Model, Action>|undefined {
-  return el[SDOM_DATA];
-}
+  updateIfNeeded = () => {
+    switch (this.state) {
+      case 'NO_REQUEST':
+	throw new Error(
+	  'Unexpected draw callback.\n' +
+	    'Please report this to <https://github.com/elm-lang/virtual-dom/issues>.'
+	);
 
+      case 'PENDING_REQUEST':
+	rAF(this.updateIfNeeded);
+	this.state = 'EXTRA_REQUEST';
+        const nextEl = this.sdom(this.prev, this.currentModel);
+        if (nextEl !== this.prev.output) {
+          this.rootEl.removeChild(this.prev.output);
+          this.rootEl.appendChild(nextEl);
+        }
+        this.prev = { output: nextEl, input: this.currentModel };
+	return;
+
+      case 'EXTRA_REQUEST':
+	this.state = 'NO_REQUEST';
+	return;
+    }
+  }
+
+  stepper(next: Model) {
+    if (this.currentModel === next) return;
+    if (this.state === 'NO_REQUEST') {
+      rAF(this.updateIfNeeded);
+    }
+    this.state = 'PENDING_REQUEST';
+    this.currentModel = next;
+    this.rootEl[SDOM_DATA].model = this.currentModel;
+  }
+};
+
+export const SDOM_DATA = '__SDOM_DATA__';
+export type SDOMData<Model, Action> = {
+  proj?(action: unknown): Action;
+  coproj?(model: Model): unknown;
+  model?: Model;
+  unlisten?: Function;
+};
 
 declare module "./index" {
   export interface H<Model, Action> {
     (name: string, ...rest: Array<Props<Model, Action>|SDOM<Model, Action>|string|number>): SDOM<Model, Action, HTMLElement>;
     text(content: string|number|((m: Model) => string|number)): SDOM<Model, Action, Text>;
-    array(name: string, props?: Props<Model, Action>): <T extends any[]>(selector: (m: Model) => T, child: (h: H<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<NestedModel<Model, T[number]>, (idx: number) => Action>) => SDOM<Model, Action>;
+    array(name: string, props?: Props<Model, Action>): <T extends any[]>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Model, Action>;
     discriminate<K extends string>(discriminator: (m: Model) => K, variants: Record<K, SDOM<Model, Action>>): SDOM<Model, Action>;
     dimap<M1, A1>(coproj: (m: Model) => M1, proj: (m: A1) => Action): (s: SDOM<M1, A1>) => SDOM<Model, Action>;
   }
