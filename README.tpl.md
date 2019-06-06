@@ -74,8 +74,8 @@ application Model to DOM nodes.
     <tr>
       <td>TodoMVC</td>
       <td>
-	    <a href=https://github.com/lagunoff/typescript-sdom/blob/master/examples/todomvc/src/index.ts target=_blank>source</a> |
-		<a href=https://lagunoff.github.io/typescript-sdom/todomvc/ target=_blank>demo<a>
+	    <a href="https://github.com/lagunoff/typescript-sdom/blob/master/examples/todomvc/src/index.ts" target="_blank">source</a> |
+		<a href="https://lagunoff.github.io/typescript-sdom/todomvc/" target="_blank">demo<a>
 	  </td>
     </tr>
   </tbody>
@@ -86,64 +86,4 @@ application Model to DOM nodes.
 - [https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
 
 ## API reference
-#### attach
-
-`function attach<Model, Action>(view: Derivative<Model, Node>, rootEl: HTMLElement, model: Model, sink?: (a: Action) => void): SDOMInstance<Model, Action>;`
-
-Start the application and attach it to `rootEl`
-
-```ts
-const view = h.div(h.h1('Hello world!', { id: 'greeting' }));
-const inst = attach(view, document.body, {});
-assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
-```
-
-#### elem
-
-`function elem<Model, Action>(name: string, ...rest: Array<string | number | Props<Model, Action, HTMLElement> | Derivative<Model, Node>>): Derivative<Model, HTMLElement>;`
-
-Create an html node
-
-```ts
-const view = elem('a', { href: '#link' });
-const el = view(null, {});
-assert.instanceOf(el, HTMLAnchorElement);
-assert.equal(el.hash, '#link');
-```
-
-#### text
-
-`function text<Model, Action>(value: string | number | ((m: Model) => string | number)): Derivative<Model, Text>;`
-
-Create Text node
-
-#### array
-
-`function array<Model, Action>(name: string, props?: Props<Model, Action, HTMLElement>): <T extends Array<any>>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => Derivative<Nested<Model, T[number]>, Node>) => Derivative<Model, Node>;`
-
-Create an html node which content is a dynamic list of child nodes
-
-```ts
-const view = h.array('ul', { class: 'list' })(
-  m => m.list,
-  h => h.li(h.text(m => m.here)),
-);
-const list = ['One', 'Two', 'Three', 'Four'];
-const el = view(null, { list });
-assert.instanceOf(el, HTMLUListElement);
-assert.equal(el.childNodes[3].innerHTML, 'Four');
-```
-
-#### dimap
-
-`function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: Derivative<M1, Node>) => Derivative<M2, Node>;`
-
-Change both type parameters inside `SDOM<Model, Action>`.
-
-#### discriminate
-
-`function discriminate<Model, Action, K extends string>(discriminator: (m: Model) => K, options: Record<K, Derivative<Model, Node>>): Derivative<Model, Node>;`
-
-Generic way to create `SDOM` which content is depends on some
-condition on `Model`. First parameter checks this condition and
-returns a key which points to the current `SDOM` inside `options`
+<%= TS_NODE_TRANSPILE_ONLY=true ts-node scripts/gendocs.ts src/sdom.ts %>
