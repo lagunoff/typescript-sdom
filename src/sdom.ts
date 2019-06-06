@@ -15,11 +15,10 @@ export type SDOMNode<Model, Action, Elem> = Elem & { [sdomSymbol]: [Model, Actio
 
 /**
  * Start the application and attach it to `rootEl`
- * ```ts
- * const view = h.div(h.h1('Hello world!', { id: 'greeting' }));
- * const inst = attach(view, document.body, {});
- * document.getElementById('greeting').textContent; // => 'Hello world!'
- * ```
+ * 
+ *    const view = h.div(h.h1('Hello world!', { id: 'greeting' }));
+ *    const inst = attach(view, document.body, {});
+ *    assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
  */
 export function attach<Model, Action>(view: SDOM<Model, Action>, rootEl: HTMLElement, model: Model, sink: (a: Action) => void = noop): SDOMInstance<Model, Action> {
   const sdom = dimap(id, (a: Action) => (sink(a), a))(view);
@@ -28,18 +27,16 @@ export function attach<Model, Action>(view: SDOM<Model, Action>, rootEl: HTMLEle
   rootEl[SDOM_DATA].model = model;
   rootEl.appendChild(el);
   const prev: Prev<Model, typeof el> = { output: el, input: model };
-
   return new SDOMInstance(rootEl, model, prev, sdom);
 }
 
 /**
  * Create an html node
- * ```ts
- * const view = elem('a', { href: '#link' });
- * const el = view(null, {});
- * el instanceof HTMLAnchorElement; // => true
- * el.href === '#link'; // => true
- * ```
+ * 
+ *    const view = elem('a', { href: '#link' });
+ *    const el = view(null, {});
+ *    assert.instanceOf(el, HTMLAnchorElement);
+ *    assert.equal(el.hash, '#link');
  */
 export function elem<Model, Action>(name: string, ...rest: Array<Props<Model, Action>|SDOM<Model, Action>|string|number>): SDOM<Model, Action, HTMLElement> {
   const childs: SDOM<Model, Action, Node>[] = [];
@@ -72,6 +69,7 @@ export function elem<Model, Action>(name: string, ...rest: Array<Props<Model, Ac
       // Destroy element
       const el = prev.output;
       const data = el[SDOM_DATA];
+      debugger;
       if (!(el instanceof HTMLElement)) throw new Error('actuate: got invalid DOM node');
       data && data.unlisten && data.unlisten();
       childs.forEach((childSdom, idx) => {
@@ -140,6 +138,15 @@ export type Nested<Parent, Child> = { parent: Parent, here: Child };
 
 /**
  * Create an html node which content is a dynamic list of child nodes
+ * 
+ *    const view = h.array('ul', { class: 'list' })(
+ *      m => m.list,
+ *      h => h.li(h.text(m => m.here)),
+ *    );
+ *    const list = ['One', 'Two', 'Three', 'Four'];
+ *    const el = view(null, { list });
+ *    assert.instanceOf(el, HTMLUListElement);
+ *    assert.equal(el.childNodes[3].innerHTML, 'Four');
  */
 export function array<Model, Action>(name: string, props: Props<Model, Action> = {}): <T extends any[]>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Model, Action> {
   return (selector, child) => (prev, next) => {

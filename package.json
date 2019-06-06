@@ -2,6 +2,19 @@
   "name": "typescript-sdom",
   "version": "0.0.1",
   "main": "./src/index.ts",
+  "scripts": {
+    "doctest": "TS_NODE_TRANSPILE_ONLY=true ts-node scripts/doctest.ts",
+    "test": "TS_NODE_TRANSPILE_ONLY=true mocha tests/*.ts -r ts-node/register"
+  },
   "license": "MIT",
-  "dependencies": {}
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "jsdom": "^15.1.1",
+    "jsdom-global": "^3.0.2",
+    "lodash": "^4.17.11",
+    "mocha": "5.2.0",
+    "ts-node": "^8.2.0",
+    "tsutils": "^3.12.0",
+    "typescript": "^3.5.1"
+  }
 }

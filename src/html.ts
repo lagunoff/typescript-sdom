@@ -67,6 +67,7 @@ declare module "./index" {
     legend: NamedH<Model, Action, HTMLElementTagNameMap['legend']>;
     li: NamedH<Model, Action, HTMLElementTagNameMap['li']>;
     link: NamedH<Model, Action, HTMLElementTagNameMap['link']>;
+    main: NamedH<Model, Action, HTMLElement>;
     map: NamedH<Model, Action, HTMLElementTagNameMap['map']>;
     mark: NamedH<Model, Action, HTMLElementTagNameMap['mark']>;
     marquee: NamedH<Model, Action, HTMLElementTagNameMap['marquee']>;
@@ -191,6 +192,7 @@ h.label = h.bind(void 0, 'label') as any;
 h.legend = h.bind(void 0, 'legend') as any;
 h.li = h.bind(void 0, 'li') as any;
 h.link = h.bind(void 0, 'link') as any;
+h.main = h.bind(void 0, 'main') as any;
 h.map = h.bind(void 0, 'map') as any;
 h.mark = h.bind(void 0, 'mark') as any;
 h.marquee = h.bind(void 0, 'marquee') as any;

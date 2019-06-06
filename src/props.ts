@@ -3,7 +3,10 @@ export type EventProp<Model, Action, Ev extends Event, Elem> = (e: WithTarget<Ev
 export type WithTarget<Ev extends Event, Target> = Omit<Ev, 'currentTarget'> & { currentTarget: Target };
 
 export type Props<Model, Action, Elem = HTMLElement> = {
-  className?: Prop<Model, string>;  style?: Prop<Model, string>;  classList?: Record<string, boolean|((m: Model) => boolean)>
+  className?: Prop<Model, string>;
+  class?: Prop<Model, string>;
+  style?: Prop<Model, string>;
+  classList?: Record<string, boolean|((m: Model) => boolean)>
   title?: Prop<Model, string>;
   selected?: Prop<Model, boolean>;
   hidden?: Prop<Model, boolean>;
@@ -171,7 +174,7 @@ export type Props<Model, Action, Elem = HTMLElement> = {
 };
 
 export const attributes = {
-  for: '',
+  for: '', class: '',
 };
 
 export type Omit<T, U extends keyof T> = { [K in Exclude<keyof T, U>]: T[K] };
