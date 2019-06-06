@@ -51,7 +51,7 @@ function printTest(test: Test): string {
 const epilog = `require('jsdom-global')();
 const assert = require('chai').assert;
 import { h } from '../src';
-import { elem, array, attach } from '../src/sdom';
+import { elem, array, attach, text } from '../src/sdom';
 `;
 
 const fileNames = ['./src/sdom.ts']

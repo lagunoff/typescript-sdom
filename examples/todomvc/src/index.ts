@@ -109,7 +109,7 @@ export const view = h.div(
       h.footer(
         { className: 'footer' },
         
-        h.span({ className: 'todo-count'}, h('strong', h.text(countItemsLeft)), ' items left'),
+        h.span({ className: 'todo-count'}, h('strong', m => countItemsLeft(m) + ' items left')),
         
         h.ul(
           { className: 'filters' },

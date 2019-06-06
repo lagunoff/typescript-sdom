@@ -122,7 +122,7 @@ declare module "./index" {
   }
 }
 
-export type NamedH<Model, Action, Elem extends Node> = (...args: Array<Props<Model, Action, Elem>|SDOM<Model, Action>|string|number>) => SDOM<Model, Action, Elem>;
+export type NamedH<Model, Action, Elem extends Node> = (...args: Array<Props<Model, Action, Elem>|SDOM<Model, Action>|string|number|((m: Model) => string)>) => SDOM<Model, Action, Elem>;
 
 export type NamedH1<Model, Action, Elem = HTMLElement> = {
   (...args: Array<Props<Model, Action, Elem>>): SDOM<Model, Action>;

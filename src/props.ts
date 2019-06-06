@@ -71,7 +71,7 @@ export type Props<Model, Action, Elem = HTMLElement> = {
   rowspan?: Prop<Model, string>;
   headers?: Prop<Model, string>;
   scope?: Prop<Model, string>;
-  async?: Prop<Model, string>;
+  async?: Prop<Model, boolean>;
   charset?: Prop<Model, string>;
   content?: Prop<Model, string>;
   defer?: Prop<Model, string>;

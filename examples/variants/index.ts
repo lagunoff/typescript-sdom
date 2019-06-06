@@ -2,9 +2,8 @@ import { variantConstructor, Variant, VariantOf } from './variant';
 import create, { SDOM, discriminate, Nested, H, dimap, attach } from '../../src';
 import css from './css';
 import * as home from './page/home';
-import * as about from './page/about';
-import * as blog from './page/blog';
-import * as contacts from './page/contacts';
+import * as lorem from './page/lorem';
+import * as parrot from './page/parrot';
 
 const h = create<Model, Action>();
 
@@ -22,9 +21,8 @@ export type Action =
 export const Page = variantConstructor<Page>();
 export type Page = Variant<{
   Home: home.Model;
-  Blog: blog.Model;
-  About: about.Model;
-  Contacts: contacts.Model;
+  Lorem: lorem.Model;
+  Parrot: parrot.Model;
 }>;
 
 // Update
@@ -44,16 +42,15 @@ export const view = h(
   h.nav(
     h.ul(
       h.li(h.a('Home', { href: '#/' })),
-      h.li(h.a('Lorem Ipsum', { href: '#/about' })),
-      h.li(h.a('Barking parrot', { href: '#/contacts' })),
+      h.li(h.a('Lorem Ipsum', { href: '#/lorem' })),
+      h.li(h.a('Barking parrot', { href: '#/parrot' })),
     ),
   ),
   
   variant(m => m.page, {
     Home: renderChildren(home.view),
-    Blog: renderChildren(blog.view),
-    About: renderChildren(about.view),
-    Contacts: renderChildren(contacts.view),
+    Lorem: renderChildren(lorem.view),
+    Parrot: renderChildren(parrot.view),
   }),
 
   h('style', { type: 'text/css' }, css),
@@ -64,9 +61,8 @@ function renderChildren<M, A>(childView: SDOM<M, A>) {
 }
 
 function pageFromHash(hash: string): Page {
-  if (hash === '#/blog') return Page('Blog', {});
-  if (hash === '#/about') return Page('About', {});
-  if (hash === '#/contacts') return Page('Contacts', {});
+  if (hash === '#/lorem') return Page('Lorem', {});
+  if (hash === '#/parrot') return Page('Parrot', {});
   return Page('Home', {});
 }
  

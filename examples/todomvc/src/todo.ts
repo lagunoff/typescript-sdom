@@ -1,4 +1,3 @@
-import { text, H } from '../../../src';
 import create from '../../../src';
 
 const h = create<Props, Action>();
@@ -67,7 +66,7 @@ export const view = h.li(
       onclick: () => ({ tag: 'Completed' }),
     }),
     
-    h.label(text(m => m.title)),
+    h.label(m => m.title),
     
     h.button({ className: 'destroy', onclick: () => ({ tag: 'Destroy' }) }),
   ),

@@ -28,21 +28,24 @@ and purescript
 
 ## Simplest app
 ```ts
+import create from 'typescript-sdom';
+const h = create<Date, never>();
+
 const view = h.div(
   { style: `text-align: center` },
-  h.h1('Local time', { style: d => `color: ` + colors[d.getSeconds() % 6] }),
-  h.p(h.text(d => d.toString()))
+  h.h1({ style: date => `color: ` + colors[date.getSeconds() % 6] }, 'Local time'),
+  h.p(date => date.toString()),
 );
 
 const colors = ['#F44336', '#03A9F4', '#4CAF50', '#3F51B5', '#607D8B', '#FF5722'];
 let model = new Date();
-const el = view(null, model);
+const el = view.create(model);
 document.body.appendChild(el);
 setInterval(tick, 1000);
 
 function tick() {
-  const prev = { input: model, output: el }, next = new Date();
-  view(prev, next);
+  const next = new Date();
+  view.update(el, model, next);
   model = next;
 }
 
@@ -88,7 +91,7 @@ application Model to DOM nodes.
 ## API reference
 #### attach
 
-`function attach<Model, Action>(view: Derivative<Model, Node>, rootEl: HTMLElement, model: Model, sink?: (a: Action) => void): SDOMInstance<Model, Action>;`
+`function attach<Model, Action>(view: SDOM<Model, Action, Node>, rootEl: HTMLElement, model: Model, sink?: (a: Action) => void): SDOMInstance<Model, Action>;`
 
 Start the application and attach it to `rootEl`
 
@@ -100,50 +103,60 @@ assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
 
 #### elem
 
-`function elem<Model, Action>(name: string, ...rest: Array<string | number | Props<Model, Action, HTMLElement> | Derivative<Model, Node>>): Derivative<Model, HTMLElement>;`
+`function elem<Model, Action>(name: string, ...rest: Array<string | number | Props<Model, Action, HTMLElement> | SDOM<Model, Action, Node> | ((m: Model) => string)>): SDOM<Model, Action, HTMLElement>;`
 
 Create an html node
 
 ```ts
 const view = elem('a', { href: '#link' });
-const el = view(null, {});
+const el = view.create({});
 assert.instanceOf(el, HTMLAnchorElement);
 assert.equal(el.hash, '#link');
 ```
 
 #### text
 
-`function text<Model, Action>(value: string | number | ((m: Model) => string | number)): Derivative<Model, Text>;`
+`function text<Model, Action>(value: string | number | ((m: Model) => string | number)): SDOM<Model, Action, Text>;`
 
 Create Text node
 
+```ts
+const view = text(n => `You have ${n} unread messages`);
+let model = 0;
+const el = view.create(model);
+assert.instanceOf(el, Text);
+assert.equal(el.nodeValue, 'You have 0 unread messages');
+view.update(el, model, 5);
+assert.equal(el.nodeValue, 'You have 5 unread messages');
+```
+
 #### array
 
-`function array<Model, Action>(name: string, props?: Props<Model, Action, HTMLElement>): <T extends Array<any>>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => Derivative<Nested<Model, T[number]>, Node>) => Derivative<Model, Node>;`
+`function array<Model, Action>(name: string, props?: Props<Model, Action, HTMLElement>): <T extends Array<any>>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Nested<Model, T[number]>, (idx: number) => Action, Node>) => SDOM<Model, Action, HTMLElement>;`
 
 Create an html node which content is a dynamic list of child nodes
 
 ```ts
 const view = h.array('ul', { class: 'list' })(
   m => m.list,
-  h => h.li(h.text(m => m.here)),
+  h => h.li(m => m.here),
 );
 const list = ['One', 'Two', 'Three', 'Four'];
-const el = view(null, { list });
+const el = view.create({ list });
 assert.instanceOf(el, HTMLUListElement);
 assert.equal(el.childNodes[3].innerHTML, 'Four');
 ```
 
 #### dimap
 
-`function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: Derivative<M1, Node>) => Derivative<M2, Node>;`
+`function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: SDOM<M1, A1, Node>) => SDOM<M2, A2, Node>;`
 
 Change both type parameters inside `SDOM<Model, Action>`.
 
 #### discriminate
 
-`function discriminate<Model, Action, K extends string>(discriminator: (m: Model) => K, options: Record<K, Derivative<Model, Node>>): Derivative<Model, Node>;`
+`function discriminate<Model, Action, K extends string>(discriminator: (m: Model) => K, options: Record<K, SDOM<Model, Action, Node>>): SDOM<Model, Action, Node>;`
 
-Generic way to create `SDOM` which content is depends on some
+Generic way to create `SDOM` which content depends on some
 condition on `Model`. First parameter checks this condition and
 returns a key which points to the current `SDOM` inside `options`
