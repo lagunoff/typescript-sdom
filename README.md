@@ -28,24 +28,21 @@ and purescript
 
 ## Simplest app
 ```ts
-import create from 'typescript-sdom';
-const h = create<Date, never>();
-
 const view = h.div(
   { style: `text-align: center` },
-  h.h1({ style: date => `color: ` + colors[date.getSeconds() % 6] }, 'Local time'),
-  h.p(date => date.toString()),
+  h.h1('Local time', { style: d => `color: ` + colors[d.getSeconds() % 6] }),
+  h.p(h.text(d => d.toString()))
 );
 
 const colors = ['#F44336', '#03A9F4', '#4CAF50', '#3F51B5', '#607D8B', '#FF5722'];
 let model = new Date();
-const el = view.create(model);
+const el = view(null, model);
 document.body.appendChild(el);
 setInterval(tick, 1000);
 
 function tick() {
-  const next = new Date();
-  view.update(el, model, next);
+  const prev = { input: model, output: el }, next = new Date();
+  view(prev, next);
   model = next;
 }
 
@@ -91,48 +88,48 @@ application Model to DOM nodes.
 ## API reference
 #### attach
 
-`function attach<Model, Action>(view: SDOM<Model, Action, Node>, rootEl: HTMLElement, model: Model, sink?: (a: Action) => void): SDOMInstance<Model, Action>;`
+`function attach<Model, Action, Elem extends Node>(view: SUI<Model, Action, Elem>, rootEl: HTMLElement, model: Model, sink?: (a: Action) => void): SDOMInstance<Model, Action, Elem>;`
 
 Start the application and attach it to `rootEl`
 
 ```ts
 const view = h.div(h.h1('Hello world!', { id: 'greeting' }));
-const inst = attach(view, document.body, {});
+const inst = sdom.attach(view, document.body, {});
 assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
 ```
 
 #### elem
 
-`function elem<Model, Action>(name: string, ...rest: Array<string | number | Props<Model, Action, HTMLElement> | SDOM<Model, Action, Node> | ((m: Model) => string)>): SDOM<Model, Action, HTMLElement>;`
+`function elem<Model, Action>(name: string, ...rest: Array<string | number | Props<Model, Action, HTMLElement> | SUI<Model, Action, Node> | ((m: Model) => string)>): SUI<Model, Action, HTMLElement>;`
 
 Create an html node
 
 ```ts
-const view = elem('a', { href: '#link' });
-const el = view.create({});
+const view = sdom.elem('a', { href: '#link' });
+const el = view.create(sdom.observable.of({}), sdom.noop);
 assert.instanceOf(el, HTMLAnchorElement);
 assert.equal(el.hash, '#link');
 ```
 
 #### text
 
-`function text<Model, Action>(value: string | number | ((m: Model) => string | number)): SDOM<Model, Action, Text>;`
+`function text<Model, Action>(value: string | number | ((m: Model) => string | number)): SUI<Model, Action, Text>;`
 
 Create Text node
 
 ```ts
-const view = text(n => `You have ${n} unread messages`);
-let model = 0;
-const el = view.create(model);
+const view = sdom.text(n => `You have ${n} unread messages`);
+const model = { value: 0, subscriptions: [] };
+const el = view.create(sdom.observable.create(model), sdom.noop);
 assert.instanceOf(el, Text);
 assert.equal(el.nodeValue, 'You have 0 unread messages');
-view.update(el, model, 5);
+sdom.observable.step(model, 5);
 assert.equal(el.nodeValue, 'You have 5 unread messages');
 ```
 
 #### array
 
-`function array<Model, Action>(name: string, props?: Props<Model, Action, HTMLElement>): <T extends Array<any>>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Nested<Model, T[number]>, (idx: number) => Action, Node>) => SDOM<Model, Action, HTMLElement>;`
+`function array<Model, Action>(name: string, props?: Props<Model, Action, HTMLElement>): <T extends Array<any>>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => SUI<Nested<Model, T[number]>, (idx: number) => Action, Node>) => SUI<Model, Action, HTMLElement>;`
 
 Create an html node which content is a dynamic list of child nodes
 
@@ -142,20 +139,20 @@ const view = h.array('ul', { class: 'list' })(
   h => h.li(m => m.here),
 );
 const list = ['One', 'Two', 'Three', 'Four'];
-const el = view.create({ list });
+const el = view.create(sdom.observable.of({ list }), sdom.noop);
 assert.instanceOf(el, HTMLUListElement);
 assert.equal(el.childNodes[3].innerHTML, 'Four');
 ```
 
 #### dimap
 
-`function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: SDOM<M1, A1, Node>) => SDOM<M2, A2, Node>;`
+`function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: SUI<M1, A1, Node>) => SUI<M2, A2, Node>;`
 
 Change both type parameters inside `SDOM<Model, Action>`.
 
 #### discriminate
 
-`function discriminate<Model, Action, K extends string>(discriminator: (m: Model) => K, options: Record<K, SDOM<Model, Action, Node>>): SDOM<Model, Action, Node>;`
+`function discriminate<Model, Action, K extends string>(discriminator: (m: Model) => K, options: Record<K, SUI<Model, Action, Node>>): SUI<Model, Action, Node>;`
 
 Generic way to create `SDOM` which content depends on some
 condition on `Model`. First parameter checks this condition and

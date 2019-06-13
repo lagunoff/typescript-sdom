@@ -12,7 +12,12 @@ export * from './sdom';
 import './html';
 export * from './html';
 export * from './props';
+import * as observable from './observable';
+export { observable };
 
-export default function create<Model, Action>(): H<Model, Action> {
+export function create<Model, Action>(): H<Model, Action> {
   return h as any;
 }
+
+export default create;
+

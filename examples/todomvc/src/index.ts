@@ -158,7 +158,7 @@ function filterFromHash(hash: string): Filter {
 
 function dispatch(action: Action) {
   const next = update(action, inst.currentModel);
-  inst.stepper(next);
+  inst.step(next);
   console.log('action', action);
   console.log('next', next);
   console.log('-----------');
