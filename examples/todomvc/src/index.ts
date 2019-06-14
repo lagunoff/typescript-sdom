@@ -4,7 +4,7 @@ import * as todo from './todo';
 import { Prop } from '../../../src/props';
 import css from './css';
 
-const h = create<Model, Action>();
+const h = create<Model, Msg>();
 
 // Model
 export type Model = {
@@ -16,19 +16,19 @@ export type Model = {
 // Filter
 export type Filter = 'all'|'active'|'completed';
 
-// Action
-export type Action =
+// Msg
+export type Msg =
   | { tag: 'Input', value: string }
   | { tag: 'ToggleAll' }
   | { tag: 'ClearCompleted' }
   | { tag: 'KeyDown/enter' }
   | { tag: 'Hash/change', hash: string }
-  | { tag: '@Todo', idx: number, action: todo.Action }
+  | { tag: '@Todo', idx: number, msg: todo.Msg }
 
 // Update
-export function update(action: Action, model: Model): Model {
-  switch (action.tag) {
-    case 'Input': return { ...model, title: action.value };
+export function update(msg: Msg, model: Model): Model {
+  switch (msg.tag) {
+    case 'Input': return { ...model, title: msg.value };
     case 'ToggleAll': {
       const checked = allChecked(model);
       const todos = model.todos.map(t => ({ ...t, completed: !checked }));
@@ -46,20 +46,20 @@ export function update(action: Action, model: Model): Model {
       return model;
     }
     case 'Hash/change': {
-      const filter = filterFromHash(action.hash);
+      const filter = filterFromHash(msg.hash);
       return { ...model, filter };
     }
     case '@Todo': {
-      if (action.action.tag === 'Destroy') {
-        const todos = model.todos.filter((_, idx) => idx !== action.idx);
+      if (msg.msg.tag === 'Destroy') {
+        const todos = model.todos.filter((_, idx) => idx !== msg.idx);
         return { ...model, todos };
       }
-      if (action.action.tag === 'Editing/commit' && model.todos[action.idx].editing === '') {
-        const todos = model.todos.filter((_, idx) => idx !== action.idx);
+      if (msg.msg.tag === 'Editing/commit' && model.todos[msg.idx].editing === '') {
+        const todos = model.todos.filter((_, idx) => idx !== msg.idx);
         return { ...model, todos };
       }
       const todos = model.todos.slice();
-      todos.splice(action.idx, 1, todo.update(action.action, todos[action.idx]));
+      todos.splice(msg.idx, 1, todo.update(msg.msg, todos[msg.idx]));
       return { ...model, todos };
     };
   }
@@ -100,9 +100,9 @@ export const view = h.div(
 
       h.array('ul', { className: 'todo-list' })(
         m => m.todos,
-        h => h.dimap<todo.Props, todo.Action>(
+        h => h.dimap<todo.Props, todo.Msg>(
           todoSelector,
-          action => idx => ({ tag: '@Todo', action, idx })
+          msg => idx => ({ tag: '@Todo', msg, idx })
         )(todo.view)
       ),
       
@@ -156,11 +156,11 @@ function filterFromHash(hash: string): Filter {
   return 'all';
 }
 
-function dispatch(action: Action) {
-  const next = update(action, inst.currentModel);
+function dispatch(msg: Msg) {
+  const next = update(msg, inst.currentModel);
   inst.step(next);
-  console.log('action', action);
-  console.log('next', next);
+  console.log('msg', msg);
+  console.log('model', next);
   console.log('-----------');
 }
 

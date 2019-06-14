@@ -1,6 +1,6 @@
 import create from '../../../src';
 
-const h = create<Props, Action>();
+const h = create<Props, Msg>();
 
 // Model
 export type Model = {
@@ -20,8 +20,8 @@ export function init(title: string): Model {
   return { title, completed: false, editing: null };
 }
 
-// Action
-export type Action =
+// Msg
+export type Msg =
   | { tag: 'Completed' }
   | { tag: 'Destroy' }
   | { tag: 'Editing/on', event: MouseEvent }
@@ -30,17 +30,17 @@ export type Action =
   | { tag: 'Editing/commit' }
 
 // Update
-export function update(action: Action, model: ReturnType<typeof init>): ReturnType<typeof init> {
-  switch (action.tag) {
+export function update(msg: Msg, model: Model): Model {
+  switch (msg.tag) {
     case 'Completed': return { ...model, completed: !model.completed };
     case 'Destroy': return model;
     case 'Editing/on': {
-      const rootEl: HTMLElement = action.event.currentTarget as any;
+      const rootEl: HTMLElement = msg.event.currentTarget as any;
       const inputEl = rootEl.parentElement!.querySelector('input.edit') as HTMLInputElement|null;
       setTimeout(() => inputEl && inputEl.focus(), 100);
       return { ...model, editing: model.title };
     }
-    case 'Editing/input': return { ...model, editing: action.value };
+    case 'Editing/input': return { ...model, editing: msg.value };
     case 'Editing/cancel': return { ...model, editing: null };
     case 'Editing/commit': {
       if (model.editing === null) return model;
@@ -80,7 +80,7 @@ export const view = h.li(
   }),
 );
 
-function handleKeydown(event: KeyboardEvent): Action|void {
+function handleKeydown(event: KeyboardEvent): Msg|void {
   if (event.keyCode === KEY_ENTER) return { tag: 'Editing/commit' };
   if (event.keyCode === KEY_ESCAPE) return { tag: 'Editing/cancel' };
 }

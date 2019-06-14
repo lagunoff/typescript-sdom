@@ -5,15 +5,15 @@ import * as home from './page/home';
 import * as lorem from './page/lorem';
 import * as parrot from './page/parrot';
 
-const h = create<Model, Action>();
+const h = create<Model, Msg>();
 
 export type Model = {
   page: Page;
 };
 
 // Action
-export type Action =
-  | { tag: '@Children', key: keyof VariantOf<Page>, action: any }
+export type Msg =
+  | { tag: '@Children', key: keyof VariantOf<Page>, msg: any }
   | { tag: 'Hash/change', hash: string }
 ;
 
@@ -26,10 +26,10 @@ export type Page = Variant<{
 }>;
 
 // Update
-export function update(action: Action, model: Model): Model {
-  switch (action.tag) {
+export function update(msg: Msg, model: Model): Model {
+  switch (msg.tag) {
     case 'Hash/change': {
-      const page = pageFromHash(action.hash);
+      const page = pageFromHash(msg.hash);
       return { ...model, page };
     }
   }
@@ -57,7 +57,7 @@ export const view = h(
 );
 
 function renderChildren<M, A>(childView: SDOM<M, A>) {
-  return (h: H<Nested<Model, M>, (k: any) => Action>) => h.dimap(m => m.here, action => key => ({ tag: '@Children', key, action }))(childView);
+  return (h: H<Nested<Model, M>, (k: any) => Msg>) => h.dimap(m => m.here, msg => key => ({ tag: '@Children', key, msg }))(childView);
 }
 
 function pageFromHash(hash: string): Page {
@@ -66,11 +66,11 @@ function pageFromHash(hash: string): Page {
   return Page('Home', {});
 }
  
-function dispatch(action: Action) {
-  const next = update(action, inst.currentModel);
+function dispatch(msg: Msg) {
+  const next = update(msg, inst.currentModel);
   inst.step(next);
-  console.log('action', action);
-  console.log('next', next);
+  console.log('msg', msg);
+  console.log('model', next);
   console.log('-----------');
 }
 

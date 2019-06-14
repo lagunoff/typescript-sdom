@@ -1,4 +1,4 @@
-export interface H<Model, Action> {
+export interface H<Model, Msg> {
   
 }
 

@@ -19,9 +19,9 @@ export type SDOM<Model, Msg, Elem extends Node = Node> = SUI<Model, Msg, Elem>;
  *    const inst = sdom.attach(view, document.body, {});
  *    assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
  */
-export function attach<Model, Action, Elem extends Node>(view: SDOM<Model, Action, Elem>, rootEl: HTMLElement, model: Model, sink: (a: Action) => void = noop): SDOMInstance<Model, Action, Elem> {
-  const value: ObservableValue<Model> = { value: model, subscriptions: [] };
-  return new SDOMInstance(rootEl, value, view, sink);
+export function attach<Model, Msg, Elem extends Node>(view: SDOM<Model, Msg, Elem>, rootEl: HTMLElement, init: Model, sink: (a: Msg) => void = noop): SDOMInstance<Model, Msg, Elem> {
+  const model: ObservableValue<Model> = { value: init, subscriptions: [] };
+  return new SDOMInstance(rootEl, model, view, sink);
 }
 
 /**
@@ -32,8 +32,8 @@ export function attach<Model, Action, Elem extends Node>(view: SDOM<Model, Actio
  *    assert.instanceOf(el, HTMLAnchorElement);
  *    assert.equal(el.hash, '#link');
  */
-export function elem<Model, Action>(name: string, ...rest: Array<Props<Model, Action>|SDOM<Model, Action>|string|number|((m: Model) => string)>): SDOM<Model, Action, HTMLElement> {
-  const childs: SDOM<Model, Action, Node>[] = [];
+export function elem<Model, Msg>(name: string, ...rest: Array<Props<Model, Msg>|SDOM<Model, Msg>|string|number|((m: Model) => string)>): SDOM<Model, Msg, HTMLElement> {
+  const childs: SDOM<Model, Msg, Node>[] = [];
   const attrs: Array<[string, string]> = [];
   const dynamicAttrs: Array<[string, (m: Model) => string]> = [];
   const props: Array<[string, any]> = [];
@@ -105,7 +105,7 @@ export function elem<Model, Action>(name: string, ...rest: Array<Props<Model, Ac
  *    sdom.observable.step(model, 5);
  *    assert.equal(el.nodeValue, 'You have 5 unread messages');
  */
-export function text<Model, Action>(value: string|number|((m: Model) => string|number)): SDOM<Model, Action, Text> {
+export function text<Model, Msg>(value: string|number|((m: Model) => string|number)): SDOM<Model, Msg, Text> {
   if (typeof(value) === 'function') {
     return {
       // Create new text node
@@ -140,7 +140,7 @@ export type Nested<Parent, Child> = { parent: Parent, here: Child };
  *    assert.instanceOf(el, HTMLUListElement);
  *    assert.equal(el.childNodes[3].innerHTML, 'Four');
  */
-export function array<Model, Action>(name: string, props: Props<Model, Action> = {}): <T extends any[]>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Model, Action, HTMLElement> {
+export function array<Model, Msg>(name: string, props: Props<Model, Msg> = {}): <T extends any[]>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Msg>) => SDOM<Nested<Model, T[number]>, (idx: number) => Msg>) => SDOM<Model, Msg, HTMLElement> {
   const rootSdom = elem(name, props);
   return (selector, child_) => {
     const child = child_(h as any);
@@ -204,7 +204,7 @@ export function array<Model, Action>(name: string, props: Props<Model, Action> =
 }
 
 /**
- * Change both type parameters inside `SDOM<Model, Action>`.
+ * Change both type parameters inside `SDOM<Model, Msg>`.
  */
 export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: SDOM<M1, A1>) => SDOM<M2, A2> {
   return sdom => {
@@ -221,7 +221,7 @@ export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2
  * condition on `Model`. First parameter checks this condition and
  * returns a key which points to the current `SDOM` inside `options`
  */
-export function discriminate<Model, Action, K extends string>(discriminator: (m: Model) => K, options: Record<K, SDOM<Model, Action>>): SDOM<Model, Action> {
+export function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, options: Record<K, SDOM<Model, Msg, El>>): SDOM<Model, Msg, El> {
   return {
     // Create new node
     create(o, sink) {
@@ -254,15 +254,15 @@ const rAF =
   : function(callback) { setTimeout(callback, 1000 / 60); };  
 
 // A running SDOM application
-export class SDOMInstance<Model, Action, Elem extends Node> {
+export class SDOMInstance<Model, Msg, Elem extends Node> {
   private state: 'NO_REQUEST'|'PENDING_REQUEST'|'EXTRA_REQUEST' = 'NO_REQUEST';
   public currentModel: Model;
   
   constructor (
     readonly rootEl: HTMLElement,
     readonly model: ObservableValue<Model>,
-    readonly view: SDOM<Model, Action, Elem>,
-    readonly sink: Sink<Action>,
+    readonly view: SDOM<Model, Msg, Elem>,
+    readonly sink: Sink<Msg>,
   ) {
     const o = observable.create(model);
     rootEl.appendChild(view.create(o, sink));
@@ -301,12 +301,12 @@ export class SDOMInstance<Model, Action, Elem extends Node> {
 
 
 declare module "./index" {
-  export interface H<Model, Action> {
-    (name: string, ...rest: Array<Props<Model, Action>|SDOM<Model, Action>|string|number|((m: Model) => string)>): SDOM<Model, Action, HTMLElement>;
-    text(content: string|number|((m: Model) => string|number)): SDOM<Model, Action, Text>;
-    array(name: string, props?: Props<Model, Action>): <T extends any[]>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Nested<Model, T[number]>, (idx: number) => Action>) => SDOM<Model, Action>;
-    discriminate<K extends string>(discriminator: (m: Model) => K, variants: Record<K, SDOM<Model, Action>>): SDOM<Model, Action>;
-    dimap<M1, A1>(coproj: (m: Model) => M1, proj: (m: A1) => Action): (s: SDOM<M1, A1>) => SDOM<Model, Action>;
+  export interface H<Model, Msg> {
+    (name: string, ...rest: Array<Props<Model, Msg>|SDOM<Model, Msg>|string|number|((m: Model) => string)>): SDOM<Model, Msg, HTMLElement>;
+    text(content: string|number|((m: Model) => string|number)): SDOM<Model, Msg, Text>;
+    array(name: string, props?: Props<Model, Msg>): <T extends any[]>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Msg>) => SDOM<Nested<Model, T[number]>, (idx: number) => Msg>) => SDOM<Model, Msg>;
+    discriminate<K extends string>(discriminator: (m: Model) => K, variants: Record<K, SDOM<Model, Msg>>): SDOM<Model, Msg>;
+    dimap<M1, A1>(coproj: (m: Model) => M1, proj: (m: A1) => Msg): (s: SDOM<M1, A1>) => SDOM<Model, Msg>;
   }
 }
 
