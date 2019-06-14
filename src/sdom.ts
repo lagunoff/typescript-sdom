@@ -205,12 +205,25 @@ export function array<Model, Msg>(name: string, props: Props<Model, Msg> = {}): 
 
 /**
  * Change both type parameters inside `SDOM<Model, Msg>`.
+ * 
+ *     type Model1 = { btnTitle: string };
+ *     type Msg1 = { tag: 'Clicked' };
+ *     type Model2 = string;
+ *     type Msg2 = 'Clicked';
+ *     let latestMsg: any = void 0;
+ *     const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+ *     const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+ *     const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+ *     el.click();
+ *     assert.instanceOf(el, HTMLButtonElement);
+ *     assert.equal(el.textContent, 'Click on me');
+ *     assert.deepEqual(latestMsg, { tag: 'Clicked' });
  */
-export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: SDOM<M1, A1>) => SDOM<M2, A2> {
-  return sdom => {
+export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): <UI>(s: SUI<M1, A1, UI>) => SUI<M2, A2, UI> {
+  return sui => {
     return {
       create(o, sink) {
-        return sdom.create(observableMap(coproj, o), a => sink(proj(a)));
+        return sui.create(observableMap(coproj, o), a => sink(proj(a)));
       },
     };
   };
@@ -220,6 +233,19 @@ export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2
  * Generic way to create `SDOM` which content depends on some
  * condition on `Model`. First parameter checks this condition and
  * returns a key which points to the current `SDOM` inside `options`
+ * 
+ *     type Tab = { tag: 'Details', info: string } | { tag: 'Comments', comments: string[] };
+ *     type Model = { tab: Tab };
+ *     const view = h.div(sdom.discriminate(m => m.tab.tag, {
+ *         Details: h.p({ id: 'details' }, m => m.tab.info),
+ *         Comments: h.p({ id: 'comments' }, m => m.tab.comments.join(', ')),
+ *     }));
+ *     const model = sdom.observable.valueOf({ tab: { tag: 'Details', info: 'This product is awesome' } });
+ *     const el = view.create(sdom.observable.create(model), sdom.noop);
+ *     assert.equal(el.childNodes[0].id, 'details'); 
+ *     assert.equal(el.childNodes[0].textContent, 'This product is awesome');
+ *     sdom.observable.step(model, { tab: { tag: 'Comments', comments: [] } });
+ *     assert.equal(el.childNodes[0].id, 'comments'); 
  */
 export function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, options: Record<K, SDOM<Model, Msg, El>>): SDOM<Model, Msg, El> {
   return {
@@ -269,7 +295,7 @@ export class SDOMInstance<Model, Msg, Elem extends Node> {
     this.currentModel = model.value;
   }
 
-  updateIfNeeded = () => {
+  Updateifneeded = () => {
     switch (this.state) {
       case 'NO_REQUEST':
         throw new Error(

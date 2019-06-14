@@ -88,7 +88,7 @@ application Model to DOM nodes.
 ## API reference
 #### attach
 
-`function attach<Model, Action, Elem extends Node>(view: SUI<Model, Action, Elem>, rootEl: HTMLElement, model: Model, sink?: (a: Action) => void): SDOMInstance<Model, Action, Elem>;`
+`function attach<Model, Msg, Elem extends Node>(view: SUI<Model, Msg, Elem>, rootEl: HTMLElement, init: Model, sink?: (a: Msg) => void): SDOMInstance<Model, Msg, Elem>;`
 
 Start the application and attach it to `rootEl`
 
@@ -100,7 +100,7 @@ assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
 
 #### elem
 
-`function elem<Model, Action>(name: string, ...rest: Array<string | number | Props<Model, Action, HTMLElement> | SUI<Model, Action, Node> | ((m: Model) => string)>): SUI<Model, Action, HTMLElement>;`
+`function elem<Model, Msg>(name: string, ...rest: Array<string | number | Props<Model, Msg, HTMLElement> | SUI<Model, Msg, Node> | ((m: Model) => string)>): SUI<Model, Msg, HTMLElement>;`
 
 Create an html node
 
@@ -113,7 +113,7 @@ assert.equal(el.hash, '#link');
 
 #### text
 
-`function text<Model, Action>(value: string | number | ((m: Model) => string | number)): SUI<Model, Action, Text>;`
+`function text<Model, Msg>(value: string | number | ((m: Model) => string | number)): SUI<Model, Msg, Text>;`
 
 Create Text node
 
@@ -129,7 +129,7 @@ assert.equal(el.nodeValue, 'You have 5 unread messages');
 
 #### array
 
-`function array<Model, Action>(name: string, props?: Props<Model, Action, HTMLElement>): <T extends Array<any>>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Action>) => SUI<Nested<Model, T[number]>, (idx: number) => Action, Node>) => SUI<Model, Action, HTMLElement>;`
+`function array<Model, Msg>(name: string, props?: Props<Model, Msg, HTMLElement>): <T extends Array<any>>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Msg>) => SUI<Nested<Model, T[number]>, (idx: number) => Msg, Node>) => SUI<Model, Msg, HTMLElement>;`
 
 Create an html node which content is a dynamic list of child nodes
 
@@ -146,14 +146,44 @@ assert.equal(el.childNodes[3].innerHTML, 'Four');
 
 #### dimap
 
-`function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): (s: SUI<M1, A1, Node>) => SUI<M2, A2, Node>;`
+`function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): <UI>(s: SUI<M1, A1, UI>) => SUI<M2, A2, UI>;`
 
-Change both type parameters inside `SDOM<Model, Action>`.
+Change both type parameters inside `SDOM<Model, Msg>`.
+
+```ts
+ type Model1 = { btnTitle: string };
+ type Msg1 = { tag: 'Clicked' };
+ type Model2 = string;
+ type Msg2 = 'Clicked';
+ let latestMsg: any = void 0;
+ const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+ const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+ const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+ el.click();
+ assert.instanceOf(el, HTMLButtonElement);
+ assert.equal(el.textContent, 'Click on me');
+ assert.deepEqual(latestMsg, { tag: 'Clicked' });
+```
 
 #### discriminate
 
-`function discriminate<Model, Action, K extends string>(discriminator: (m: Model) => K, options: Record<K, SUI<Model, Action, Node>>): SUI<Model, Action, Node>;`
+`function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, options: Record<K, SUI<Model, Msg, El>>): SUI<Model, Msg, El>;`
 
 Generic way to create `SDOM` which content depends on some
 condition on `Model`. First parameter checks this condition and
 returns a key which points to the current `SDOM` inside `options`
+
+```ts
+ type Tab = { tag: 'Details', info: string } | { tag: 'Comments', comments: string[] };
+ type Model = { tab: Tab };
+ const view = h.div(sdom.discriminate(m => m.tab.tag, {
+     Details: h.p({ id: 'details' }, m => m.tab.info),
+     Comments: h.p({ id: 'comments' }, m => m.tab.comments.join(', ')),
+ }));
+ const model = sdom.observable.valueOf({ tab: { tag: 'Details', info: 'This product is awesome' } });
+ const el = view.create(sdom.observable.create(model), sdom.noop);
+ assert.equal(el.childNodes[0].id, 'details'); 
+ assert.equal(el.childNodes[0].textContent, 'This product is awesome');
+ sdom.observable.step(model, { tab: { tag: 'Comments', comments: [] } });
+ assert.equal(el.childNodes[0].id, 'comments');
+```

@@ -46,3 +46,37 @@ describe("array", () => {
     assert.equal(el.childNodes[3].innerHTML, 'Four');
   });
 });
+
+describe("dimap", () => {
+  it('test #1', () => {
+     type Model1 = { btnTitle: string };
+     type Msg1 = { tag: 'Clicked' };
+     type Model2 = string;
+     type Msg2 = 'Clicked';
+     let latestMsg: any = void 0;
+     const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+     const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+     const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+     el.click();
+     assert.instanceOf(el, HTMLButtonElement);
+     assert.equal(el.textContent, 'Click on me');
+     assert.deepEqual(latestMsg, { tag: 'Clicked' });
+  });
+});
+
+describe("discriminate", () => {
+  it('test #1', () => {
+     type Tab = { tag: 'Details', info: string } | { tag: 'Comments', comments: string[] };
+     type Model = { tab: Tab };
+     const view = h.div(sdom.discriminate(m => m.tab.tag, {
+         Details: h.p({ id: 'details' }, m => m.tab.info),
+         Comments: h.p({ id: 'comments' }, m => m.tab.comments.join(', ')),
+     }));
+     const model = sdom.observable.valueOf({ tab: { tag: 'Details', info: 'This product is awesome' } });
+     const el = view.create(sdom.observable.create(model), sdom.noop);
+     assert.equal(el.childNodes[0].id, 'details'); 
+     assert.equal(el.childNodes[0].textContent, 'This product is awesome');
+     sdom.observable.step(model, { tab: { tag: 'Comments', comments: [] } });
+     assert.equal(el.childNodes[0].id, 'comments');
+  });
+});
