@@ -25,7 +25,7 @@ describe("elem", () => {
 describe("text", () => {
   it('test #1', () => {
     const view = sdom.text(n => `You have ${n} unread messages`);
-    const model = { value: 0, subscriptions: [] };
+    const model = sdom.observable.valueOf(0);
     const el = view.create(sdom.observable.create(model), sdom.noop);
     assert.instanceOf(el, Text);
     assert.equal(el.nodeValue, 'You have 0 unread messages');

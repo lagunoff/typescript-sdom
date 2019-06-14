@@ -1,7 +1,7 @@
 import { Props, attributes } from './props'
 import { h, H } from './index';
-import * as subscribe from './observable';
-import { Observable, ObservableRef, observableMap } from './observable';
+import * as observable from './observable';
+import { Observable, ObservableValue, observableMap } from './observable';
 
 export type Sink<T> = (x: T) => void;
 export type PrevNext<T> = { prev:T; next: T; };
@@ -20,8 +20,8 @@ export type SDOM<Model, Msg, Elem extends Node = Node> = SUI<Model, Msg, Elem>;
  *    assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
  */
 export function attach<Model, Action, Elem extends Node>(view: SDOM<Model, Action, Elem>, rootEl: HTMLElement, model: Model, sink: (a: Action) => void = noop): SDOMInstance<Model, Action, Elem> {
-  const ref: ObservableRef<Model> = { value: model, subscriptions: [] };
-  return new SDOMInstance(rootEl, ref, view, sink);
+  const value: ObservableValue<Model> = { value: model, subscriptions: [] };
+  return new SDOMInstance(rootEl, value, view, sink);
 }
 
 /**
@@ -62,11 +62,11 @@ export function elem<Model, Action>(name: string, ...rest: Array<Props<Model, Ac
   return {
     // Create new element
     create(o, sink) {
-      const init = o.getLatest();
+      const init = o.getValue();
       const el = document.createElement(name);
       const eventListeners: any[] = events.map(([k, handler]) => {
         const listener = e => {
-          const action = handler(e, o.getLatest());
+          const action = handler(e, o.getValue());
           if (action !== void 0) sink(action);
         }
         el.addEventListener(k, listener);
@@ -98,7 +98,7 @@ export function elem<Model, Action>(name: string, ...rest: Array<Props<Model, Ac
  * Create Text node
  * 
  *    const view = sdom.text(n => `You have ${n} unread messages`);
- *    const model = { value: 0, subscriptions: [] };
+ *    const model = sdom.observable.valueOf(0);
  *    const el = view.create(sdom.observable.create(model), sdom.noop);
  *    assert.instanceOf(el, Text);
  *    assert.equal(el.nodeValue, 'You have 0 unread messages');
@@ -110,7 +110,7 @@ export function text<Model, Action>(value: string|number|((m: Model) => string|n
     return {
       // Create new text node
       create(o) {
-        const el = document.createTextNode(String(value(o.getLatest())));
+        const el = document.createTextNode(String(value(o.getValue())));
         o.subscribe(pv => el.nodeValue = String(value(pv.next)), noop);
         return el;
       },
@@ -144,20 +144,19 @@ export function array<Model, Action>(name: string, props: Props<Model, Action> =
   const rootSdom = elem(name, props);
   return (selector, child_) => {
     const child = child_(h as any);
-    const childArgs: Array<[ObservableRef<any>, Observable<any>, Sink<any>]> = [];
+    const childModels: ObservableValue<any>[] = [];
     return {
       // Create new DOM node
       create(o, sink) {
-        const init = o.getLatest();
+        const init = o.getValue();
         const xs = selector(init);
         const el = rootSdom.create(o, sink);
         
         xs.forEach((here, idx) => {
-          const childObservableRef = { value: { here, parent: init }, subscriptions: [] };
-          const childObservable = subscribe.create<any>(childObservableRef);
+          const childModel = { value: { here, parent: init }, subscriptions: [] };
           const childSink = (action: any) => sink(action(idx));
-          const childEl = child.create(childObservable, childSink);
-          childArgs.push([childObservableRef, childObservable, childSink]);
+          const childEl = child.create(observable.create<any>(childModel), childSink);
+          childModels.push(childModel);
           el.appendChild(childEl);
         });
         o.subscribe(onNext, onComplete);
@@ -172,15 +171,14 @@ export function array<Model, Action>(name: string, props: Props<Model, Action> =
             const idx = i;
             const childEl = el.childNodes[i] as any;
             if (i in xsPrev && !(i in xs)) {
-              childArgs[i][0].subscriptions.forEach(s => s.onComplete());
+              childModels[i][0].subscriptions.forEach(s => s.onComplete());
               el.removeChild(childEl);
-              childArgs.splice(i, 1);
+              childModels.splice(i, 1);
             } else if(!(i in xsPrev) && i in xs) {
-              const childObservableRef = { value: { here: xs[i], parent: next }, subscriptions: [] };
-              const childObservable = subscribe.create<any>(childObservableRef);
+              const childModel = { value: { here: xs[i], parent: next }, subscriptions: [] };
               const childSink = (action: any) => sink(action(idx));
-              const nextEl = child.create(childObservable, childSink);
-              childArgs.push([childObservableRef, childObservable, childSink]);
+              const nextEl = child.create(observable.create<any>(childModel), childSink);
+              childModels.push(childModel);
 
               if (lastInserted) {
                 el.insertBefore(nextEl, lastInserted);
@@ -190,14 +188,14 @@ export function array<Model, Action>(name: string, props: Props<Model, Action> =
                 lastInserted = nextEl;
               }            
             } else {
-              subscribe.step(childArgs[i][0], { here: xs[i], parent: next });
+              observable.step(childModels[i][0], { here: xs[i], parent: next });
             }
           }
         }
 
         function onComplete() {
-          for (const a of childArgs) {
-            subscribe.complete(a[0]);
+          for (const a of childModels) {
+            observable.complete(a[0]);
           }
         }
       },
@@ -227,7 +225,7 @@ export function discriminate<Model, Action, K extends string>(discriminator: (m:
   return {
     // Create new node
     create(o, sink) {
-      const key = discriminator(o.getLatest());
+      const key = discriminator(o.getValue());
       const el = options[key].create(o, sink);
       o.subscribe(onNext, noop);
       return el;
@@ -262,37 +260,37 @@ export class SDOMInstance<Model, Action, Elem extends Node> {
   
   constructor (
     readonly rootEl: HTMLElement,
-    readonly ref: ObservableRef<Model>,
+    readonly model: ObservableValue<Model>,
     readonly view: SDOM<Model, Action, Elem>,
     readonly sink: Sink<Action>,
   ) {
-    const o = subscribe.create(ref);
+    const o = observable.create(model);
     rootEl.appendChild(view.create(o, sink));
-    this.currentModel = ref.value;
+    this.currentModel = model.value;
   }
 
   updateIfNeeded = () => {
     switch (this.state) {
       case 'NO_REQUEST':
-	throw new Error(
-	  'Unexpected draw callback.\n' +
-	    'Please report this to <https://github.com/elm-lang/virtual-dom/issues>.'
-	);
+        throw new Error(
+          'Unexpected draw callback.\n' +
+            'Please report this to <https://github.com/elm-lang/virtual-dom/issues>.'
+        );
 
       case 'PENDING_REQUEST':
-	rAF(this.updateIfNeeded);
-	this.state = 'EXTRA_REQUEST';
-        subscribe.step(this.ref, this.currentModel);
-	return;
+        rAF(this.updateIfNeeded);
+        this.state = 'EXTRA_REQUEST';
+        observable.step(this.model, this.currentModel);
+        return;
 
       case 'EXTRA_REQUEST':
-	this.state = 'NO_REQUEST';
-	return;
+        this.state = 'NO_REQUEST';
+        return;
     }
   }
 
   step(next: Model) {
-    if (this.ref.value === next) return;
+    if (this.model.value === next) return;
     if (this.state === 'NO_REQUEST') {
       rAF(this.updateIfNeeded);
     }

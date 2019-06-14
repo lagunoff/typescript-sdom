@@ -28,24 +28,24 @@ and purescript
 
 ## Simplest app
 ```ts
+import * as sdom from '../../src';
+const h = sdom.create<Date, never>();
+
 const view = h.div(
   { style: `text-align: center` },
-  h.h1('Local time', { style: d => `color: ` + colors[d.getSeconds() % 6] }),
-  h.p(h.text(d => d.toString()))
+  h.h1({ style: date => `color: ` + colors[date.getSeconds() % 6] }, 'Local time'),
+  h.p(date => date.toString()),
 );
 
 const colors = ['#F44336', '#03A9F4', '#4CAF50', '#3F51B5', '#607D8B', '#FF5722'];
-let model = new Date();
-const el = view(null, model);
+const model = sdom.observable.valueOf(new Date());
+const el = view.create(sdom.observable.create(model), sdom.noop);
 document.body.appendChild(el);
 setInterval(tick, 1000);
 
 function tick() {
-  const prev = { input: model, output: el }, next = new Date();
-  view(prev, next);
-  model = next;
+  sdom.observable.step(model, new Date());
 }
-
 ```
 
 ## Representation 
