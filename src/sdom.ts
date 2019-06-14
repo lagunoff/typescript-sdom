@@ -252,8 +252,9 @@ export function discriminate<Model, Msg, El extends Node, K extends string>(disc
     // Create new node
     create(o, sink) {
       const key = discriminator(o.getValue());
-      const el = options[key].create(o, sink);
-      o.subscribe(onNext, noop);
+      const childModel: ObservableValue<any> = observable.valueOf(o.getValue());
+      const el = options[key].create(observable.create(childModel), sink);
+      o.subscribe(onNext, onComplete);
       return el;
       
       // Update existing text node
@@ -262,9 +263,17 @@ export function discriminate<Model, Msg, El extends Node, K extends string>(disc
         const nextKey = discriminator(next);
         if (prevKey !== nextKey) {
           // Key is changed, so we don't update but switch to the new node
-          const nextEl = options[nextKey].create(o, sink);
+          observable.complete(childModel);
+          observable.step(childModel, next);
+          const nextEl = options[nextKey].create(observable.create(childModel), sink);
           el.parentNode!.replaceChild(nextEl, el);
+        } else {
+          observable.step(childModel, next);          
         }
+      }
+
+      function onComplete() {
+        observable.complete(childModel);        
       }
     },
   };
@@ -295,7 +304,7 @@ export class SDOMInstance<Model, Msg, Elem extends Node> {
     this.currentModel = model.value;
   }
 
-  Updateifneeded = () => {
+  updateIfNeeded = () => {
     switch (this.state) {
       case 'NO_REQUEST':
         throw new Error(
