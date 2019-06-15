@@ -7,8 +7,7 @@
 **/*~
 **/*.kate-swp
 **/.directory
-/npm-debug.log
-/dist
+/lib
 /yarn-error.log
 /.dir-locals.el
 /yarn-errors.log

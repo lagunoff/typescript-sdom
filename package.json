@@ -1,8 +1,11 @@
 {
   "name": "typescript-sdom",
   "version": "0.0.1",
-  "main": "./src/index.ts",
+  "main": "./lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": ["lib", "README.md"],
   "scripts": {
+    "build": "tsc --outDir lib -d",
     "doctest": "TS_NODE_TRANSPILE_ONLY=true ts-node scripts/doctest.ts",
     "test": "TS_NODE_TRANSPILE_ONLY=true mocha tests/*.ts -r ts-node/register"
   },
