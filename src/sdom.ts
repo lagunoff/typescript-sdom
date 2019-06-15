@@ -76,7 +76,9 @@ export function elem<Model, Msg>(name: string, ...rest: Array<Props<Model, Msg>|
       attrs.forEach(([k, v]) => el.setAttribute(k, v));
       dynamicAttrs.forEach(([k, fn]) => el.setAttribute(k, fn(init)));
       childs.forEach(ch => el.appendChild(ch.create(o, sink)));
-      o.subscribe(onNext, onComplete)
+      if (dynamicProps.length !== 0 || dynamicAttrs.length !== 0 || eventListeners.length !== 0) {
+        o.subscribe(onNext, onComplete)
+      }
       return el;
 
       // Update existing element
@@ -161,7 +163,8 @@ export function array<Model, Msg>(name: string, props: Props<Model, Msg> = {}): 
             const idx = i;
             const childEl = el.childNodes[i] as any;
             if (i in xsPrev && !(i in xs)) {
-              childModels[i].subscriptions.forEach(s => s.onComplete());
+              const { subscriptions } = childModels[i];
+              subscriptions && subscriptions.forEach(s => s.onComplete());
               el.removeChild(childEl);
               childModels.splice(i, 1);
             } else if(!(i in xsPrev) && i in xs) {

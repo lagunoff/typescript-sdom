@@ -1,4 +1,4 @@
-# Work-In-Progress nothing works yet
+# Work-In-Progress, don't rely on this API
 
 Virtual DOM vs SDOM aproach:
 ```ts
@@ -16,12 +16,12 @@ const sdom = h.div({ class: model => model.active ? 'active' : '' },
 ```
 
 ## Explanation
-`SDOM` stands for Static DOM, like VirtualDOM this is a technique used
-to declaratively describe GUIs. SDOM solves performance problems in
-VirtualDOM by sacrificing some expressiveness. Basically, only the
-attributes and content of the `Text` nodes can change over time, the
-shape of DOM tree remains constant, thus `Static DOM`. The idea is by
-[Phil Freeman](https://github.com/paf31) see his
+`SDOM` stands for Static DOM, like VirtualDOM this is a declarative
+way of describing GUIs. SDOM solves performance problems in VirtualDOM
+by sacrificing some expressiveness. Basically, only the attributes and
+the contents of `Text` nodes can change over time, the overall shape
+of DOM tree remains constant, thus `Static DOM`. The idea is by [Phil
+Freeman](https://github.com/paf31) see his
 [post](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
 and purescript
 [implementation](https://github.com/paf31/purescript-sdom).
@@ -66,15 +66,15 @@ export type ObservableValue<T> = { value: T; subscriptions?: Subscription<{ prev
 type `Model` and produces events of type `Msg` also value of type `El`
 is the end-product of running `SDOM` component, in case of browser
 apps `El` is a subset of type `Node` (could be Text, HTMLDivElement
-etc), but the definition of `SDOM` is supposed to work in other setups
-as well by changing `El` parameter to the relevant type. This library
-has module `src/observable.ts` that implements minimal
-subscription-based functionality for delaing with values that can
-change over time. `Observable<T>` and `ObservableValue<T>` are the
-most important definitions from that module. `ObservableValue<T>` is
-the source that contains changing value and `Observable<T>` provides
-interface for querying that value and also to setup notifications for
-future changes.
+etc), but the definition of `SDOM` is supposed to work in other
+settings as well by changing `El` parameter to the relevant type. The
+module [src/observable.ts](`src/observable.ts`) contains minimal
+implementation of subscription-based functionality for delaing with
+values that can change over time. `Observable<T>` and
+`ObservableValue<T>` are the most important definitions from that
+module. `ObservableValue<T>` is the source that contains changing
+value and `Observable<T>` provides interface for querying that value
+and also to setup notifications for future changes.
 
 ## Examples
 
