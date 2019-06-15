@@ -3,7 +3,7 @@ export type Subscribe<T> = (onNext: (x: T) => void, onComplete: () => void) => U
 export type Subscription<T> = { onNext: (x: T) => void; onComplete: () => void; };
 export type PrevNext<T> = { prev: T; next: T; };
 export type ObservableValue<T> = { value: T; subscriptions: Subscription<PrevNext<T>>[]; };
-export type Observable<T> = { subscribe: Subscribe<PrevNext<T>>; getValue(): T; }; 
+export type Observable<T> = { subscribe: Subscribe<PrevNext<T>>; getValue(): T; };
 
 export function create<T>(v: ObservableValue<T>): Observable<T> {
   const getValue = () => v.value;

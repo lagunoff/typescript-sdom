@@ -1,10 +1,9 @@
 import { Props, attributes } from './props'
 import { h, H } from './index';
 import * as observable from './observable';
-import { Observable, ObservableValue, observableMap } from './observable';
+import { Observable, ObservableValue, observableMap, PrevNext } from './observable';
 
 export type Sink<T> = (x: T) => void;
-export type PrevNext<T> = { prev:T; next: T; };
 
 export type SUI<Model, Msg, UI> = {
   create(o: Observable<Model>, sink: Sink<Msg>): UI;

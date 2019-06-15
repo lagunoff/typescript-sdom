@@ -51,30 +51,53 @@ function tick() {
 ## Representation 
 Simplified definitions of the main data types:
 ```ts
-type SDOM<Model, Action> = Derivative<Model, HTMLElement>;
-type Derivative<Input, Output> = (prev: Prev<Input, Output>|null, next: Input|null) => Output;
-type Prev<Input, Output> = { input: Input, output: Output };
+export type SDOM<Model, Msg, El> = {
+  create(o: Observable<Model>, sink: Sink<Msg>): El;
+};
+export type Sink<T> = (x: T) => void;
+export type Observable<T> = { subscribe: Subscribe<{ prev: T; next: T; }>>; getValue(): T; }; 
+export type Subscribe<T> = (onNext: (x: T) => void, onComplete: () => void) => Unlisten;
+export type Unlisten = () => void;
+export type Subscription<T> = { onNext: (x: T) => void; onComplete: () => void; };
+export type ObservableValue<T> = { value: T; subscriptions?: Subscription<{ prev: T; next: T }>>[]; };
 ```
 
-```ts
-const 
-const el = view(null, model); // Create new output
-const newEl = view({ input: model, output: el }, newModel); // Update output
-view({ input: model, output: el }, null); // Free resources
-```
-
-Input is immutable and `Output` can be changed in-place. `SDOM` is
-defined in terms of `Derivative` and it simply a `Derivative` from
-application Model to DOM nodes.
+`SDOM<Model, Msg, El>` describes a piece of UI that consumes data of
+type `Model` and produces events of type `Msg` also value of type `El`
+is the end-product of running `SDOM` component, in case of browser
+apps `El` is a subset of type `Node` (could be Text, HTMLDivElement
+etc), but the definition of `SDOM` is supposed to work in other setups
+as well by changing `El` parameter to the relevant type. This library
+has module `src/observable.ts` that implements minimal
+subscription-based functionality for delaing with values that can
+change over time. `Observable<T>` and `ObservableValue<T>` are the
+most important definitions from that module. `ObservableValue<T>` is
+the source that contains changing value and `Observable<T>` provides
+interface for querying that value and also to setup notifications for
+future changes.
 
 ## Examples
 
 <table>
   <tbody>
     <tr>
+      <td>Simple app</td>
+      <td>
+	    <a href=./examples/simple/index.ts target=_blank>source</a> |
+		<a href=https://lagunoff.github.io/typescript-sdom/simple/ target=_blank>demo<a>
+	  </td>
+    </tr>
+    <tr>
+      <td>Variants</td>
+      <td>
+	    <a href=./examples/variants/index.ts target=_blank>source</a> |
+		<a href=https://lagunoff.github.io/typescript-sdom/variants/ target=_blank>demo<a>
+	  </td>
+    </tr>
+    <tr>
       <td>TodoMVC</td>
       <td>
-	    <a href=https://github.com/lagunoff/typescript-sdom/blob/master/examples/todomvc/src/index.ts target=_blank>source</a> |
+	    <a href=./examples/todomvc/src/index.ts target=_blank>source</a> |
 		<a href=https://lagunoff.github.io/typescript-sdom/todomvc/ target=_blank>demo<a>
 	  </td>
     </tr>
