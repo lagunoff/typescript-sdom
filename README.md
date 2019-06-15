@@ -38,7 +38,7 @@ const view = h.div(
 );
 
 const colors = ['#F44336', '#03A9F4', '#4CAF50', '#3F51B5', '#607D8B', '#FF5722'];
-const model = sdom.observable.valueOf(new Date());
+const model = { value: new Date() };
 const el = view.create(sdom.observable.create(model), sdom.noop);
 document.body.appendChild(el);
 setInterval(tick, 1000);
@@ -142,7 +142,7 @@ Create Text node
 
 ```ts
 const view = sdom.text(n => `You have ${n} unread messages`);
-const model = sdom.observable.valueOf(0);
+const model = { value: 0 };
 const el = view.create(sdom.observable.create(model), sdom.noop);
 assert.instanceOf(el, Text);
 assert.equal(el.nodeValue, 'You have 0 unread messages');
@@ -203,7 +203,7 @@ returns a key which points to the current `SDOM` inside `options`
      Details: h.p({ id: 'details' }, m => m.tab.info),
      Comments: h.p({ id: 'comments' }, m => m.tab.comments.join(', ')),
  }));
- const model = sdom.observable.valueOf({ tab: { tag: 'Details', info: 'This product is awesome' } });
+ const model = { value: { tab: { tag: 'Details', info: 'This product is awesome' } } };
  const el = view.create(sdom.observable.create(model), sdom.noop);
  assert.equal(el.childNodes[0].id, 'details'); 
  assert.equal(el.childNodes[0].textContent, 'This product is awesome');

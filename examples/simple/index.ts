@@ -8,7 +8,7 @@ const view = h.div(
 );
 
 const colors = ['#F44336', '#03A9F4', '#4CAF50', '#3F51B5', '#607D8B', '#FF5722'];
-const model = sdom.observable.valueOf(new Date());
+const model = { value: new Date() };
 const el = view.create(sdom.observable.create(model), sdom.noop);
 document.body.appendChild(el);
 setInterval(tick, 1000);

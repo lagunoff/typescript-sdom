@@ -97,7 +97,7 @@ export function elem<Model, Msg>(name: string, ...rest: Array<Props<Model, Msg>|
  * Create Text node
  * 
  *    const view = sdom.text(n => `You have ${n} unread messages`);
- *    const model = sdom.observable.valueOf(0);
+ *    const model = { value: 0 };
  *    const el = view.create(sdom.observable.create(model), sdom.noop);
  *    assert.instanceOf(el, Text);
  *    assert.equal(el.nodeValue, 'You have 0 unread messages');
@@ -230,7 +230,7 @@ export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2
  *         Details: h.p({ id: 'details' }, m => m.tab.info),
  *         Comments: h.p({ id: 'comments' }, m => m.tab.comments.join(', ')),
  *     }));
- *     const model = sdom.observable.valueOf({ tab: { tag: 'Details', info: 'This product is awesome' } });
+ *     const model = { value: { tab: { tag: 'Details', info: 'This product is awesome' } } };
  *     const el = view.create(sdom.observable.create(model), sdom.noop);
  *     assert.equal(el.childNodes[0].id, 'details'); 
  *     assert.equal(el.childNodes[0].textContent, 'This product is awesome');
