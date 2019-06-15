@@ -54,7 +54,7 @@ import * as sdom from '../src';
 const h = sdom.create();
 `;
 
-const fileNames = ['./src/sdom.ts']
+const fileNames = ['./src/index.ts']
 const tests = generateDocs(fileNames, { target: ts.ScriptTarget.ES5, module: ts.ModuleKind.CommonJS });
 const testContent = Object.keys(tests).map(file => '// --[ ' + file + ' ]--\n' +  tests[file].map(printTest).join('\n\n')).join('\n');
 fs.writeFileSync('./tests/01-doctest.ts', epilog + '\n\n' + testContent);

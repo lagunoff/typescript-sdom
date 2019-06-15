@@ -109,4 +109,4 @@ and also to setup notifications for future changes.
 - [https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
 
 ## API reference
-<%= TS_NODE_TRANSPILE_ONLY=true ts-node scripts/gendocs.ts src/sdom.ts %>
+<%= TS_NODE_TRANSPILE_ONLY=true ts-node scripts/gendocs.ts src/index.ts %>

@@ -55,10 +55,11 @@ export function generateDocs(fileNames: string[], options: ts.CompilerOptions) {
       if (symbol && parent && !output.hasOwnProperty(name)) {
         output[name] = serializeMethod(node, symbol, parent);
       }
-    } else if (ts.isVariableDeclaration(node)) {
-      const symbol = checker.getSymbolAtLocation(node) || node['symbol'];
+    } else if (ts.isVariableStatement(node)) {
+      const declarationNode = node.declarationList.declarations[0];
+      const symbol = checker.getSymbolAtLocation(declarationNode) || declarationNode['symbol'];
       if (symbol && !output.hasOwnProperty(symbol.getName())) {
-        output[symbol.getName()] = serializeFunction(node, symbol);
+        output[symbol.getName()] = serializeFunction(declarationNode, symbol);
       }
     } else if (ts.isTypeAliasDeclaration(node) && isNodeExported(node)) {
       node.type
@@ -180,9 +181,7 @@ function processIndentedCode(doc: string) {
   }).join('\n');
 }
 
-const priority = ['src/sdom.ts'];
+const priority = ['src/index.ts'];
 const fileNames = process.argv.slice(2);
 const docEntries = generateDocs(fileNames, { target: ts.ScriptTarget.ES5, module: ts.ModuleKind.CommonJS });
-
-// console.log(docEntries);
 console.log(generateMarkdown(docEntries, priority));

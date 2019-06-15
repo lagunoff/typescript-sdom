@@ -4,7 +4,23 @@ import * as sdom from '../src';
 const h = sdom.create();
 
 
-// --[ src/sdom.ts ]--
+// --[ src/index.ts ]--
+describe("create", () => {
+  it('test #1', () => {
+     type Model = { counter: number };
+     type Msg = 'Click';
+     const h = sdom.create<Model, Msg>();
+     const view = h.div(
+         h.p(m => `You clicked ${m.counter} times`),
+         h.button('Click here', { onclick: () => 'Click' }),
+     );
+     const model = { value: { counter: 0 } };
+     const el = view.create(sdom.observable.create(model), sdom.noop);
+     assert.instanceOf(el.childNodes[0], HTMLParagraphElement);
+     assert.instanceOf(el.childNodes[1], HTMLButtonElement);
+  });
+});
+
 describe("attach", () => {
   it('test #1', () => {
     const view = h.div(h.h1('Hello world!', { id: 'greeting' }));
@@ -25,7 +41,7 @@ describe("elem", () => {
 describe("text", () => {
   it('test #1', () => {
     const view = sdom.text(n => `You have ${n} unread messages`);
-    const model = sdom.observable.valueOf(0);
+    const model = { value: 0 };
     const el = view.create(sdom.observable.create(model), sdom.noop);
     assert.instanceOf(el, Text);
     assert.equal(el.nodeValue, 'You have 0 unread messages');
@@ -72,7 +88,7 @@ describe("discriminate", () => {
          Details: h.p({ id: 'details' }, m => m.tab.info),
          Comments: h.p({ id: 'comments' }, m => m.tab.comments.join(', ')),
      }));
-     const model = sdom.observable.valueOf({ tab: { tag: 'Details', info: 'This product is awesome' } });
+     const model = { value: { tab: { tag: 'Details', info: 'This product is awesome' } } };
      const el = view.create(sdom.observable.create(model), sdom.noop);
      assert.equal(el.childNodes[0].id, 'details'); 
      assert.equal(el.childNodes[0].textContent, 'This product is awesome');

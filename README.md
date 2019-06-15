@@ -109,6 +109,33 @@ and also to setup notifications for future changes.
 - [https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
 
 ## API reference
+#### create
+
+`function create<Model, Action>(): H<Model, Action>;`
+
+Bind type parameters for `h`.
+
+```ts
+ type Model = { counter: number };
+ type Msg = 'Click';
+ const h = sdom.create<Model, Msg>();
+ const view = h.div(
+     h.p(m => `You clicked ${m.counter} times`),
+     h.button('Click here', { onclick: () => 'Click' }),
+ );
+ const model = { value: { counter: 0 } };
+ const el = view.create(sdom.observable.create(model), sdom.noop);
+ assert.instanceOf(el.childNodes[0], HTMLParagraphElement);
+ assert.instanceOf(el.childNodes[1], HTMLButtonElement);
+```
+
+#### h
+
+`function h(name: string, ...rest: Array<string | number | Props<unknown, unknown, HTMLElement> | SUI<unknown, unknown, Node> | ((m: unknown) => string)>): SUI<unknown, unknown, HTMLElement>;`
+
+Shorthand for many API functions with bound `Model` and `Msg`
+parameters
+
 #### attach
 
 `function attach<Model, Msg, Elem extends Node>(view: SUI<Model, Msg, Elem>, rootEl: HTMLElement, init: Model, sink?: (a: Msg) => void): SDOMInstance<Model, Msg, Elem>;`
