@@ -106,24 +106,15 @@ export function elem<Model, Msg>(name: string, ...rest: Array<Props<Model, Msg>|
  *    assert.equal(el.nodeValue, 'You have 5 unread messages');
  */
 export function text<Model, Msg>(value: string|number|((m: Model) => string|number)): SDOM<Model, Msg, Text> {
-  if (typeof(value) === 'function') {
-    return {
-      // Create new text node
-      create(o) {
-        const el = document.createTextNode(String(value(o.getValue())));
-        o.subscribe(pv => el.nodeValue = String(value(pv.next)), noop);
-        return el;
-      },
-    };
-  } else {
-    return {
-      // Create new text node
-      create() {
-        const el = document.createTextNode(String(value));
-        return el;
-      },    
-    };    
-  }
+  return {
+    // Create new text node
+    create(o) {
+      const content = typeof(value) === 'function' ? String(value(o.getValue())) : String(value);
+      const el = document.createTextNode(content);
+      if (typeof(value) === 'function') o.subscribe(pv => el.nodeValue = String(value(pv.next)), noop);
+      return el;
+    },
+  };
 }
 
 export type Nested<Parent, Child> = { parent: Parent, here: Child };
@@ -171,7 +162,7 @@ export function array<Model, Msg>(name: string, props: Props<Model, Msg> = {}): 
             const idx = i;
             const childEl = el.childNodes[i] as any;
             if (i in xsPrev && !(i in xs)) {
-              childModels[i][0].subscriptions.forEach(s => s.onComplete());
+              childModels[i].subscriptions.forEach(s => s.onComplete());
               el.removeChild(childEl);
               childModels.splice(i, 1);
             } else if(!(i in xsPrev) && i in xs) {
@@ -188,7 +179,7 @@ export function array<Model, Msg>(name: string, props: Props<Model, Msg> = {}): 
                 lastInserted = nextEl;
               }            
             } else {
-              observable.step(childModels[i][0], { here: xs[i], parent: next });
+              observable.step(childModels[i], { here: xs[i], parent: next });
             }
           }
         }
@@ -253,7 +244,7 @@ export function discriminate<Model, Msg, El extends Node, K extends string>(disc
     create(o, sink) {
       const key = discriminator(o.getValue());
       const childModel: ObservableValue<any> = observable.valueOf(o.getValue());
-      const el = options[key].create(observable.create(childModel), sink);
+      let el = options[key].create(observable.create(childModel), sink);
       o.subscribe(onNext, onComplete);
       return el;
       
@@ -267,6 +258,7 @@ export function discriminate<Model, Msg, El extends Node, K extends string>(disc
           observable.step(childModel, next);
           const nextEl = options[nextKey].create(observable.create(childModel), sink);
           el.parentNode!.replaceChild(nextEl, el);
+          el = nextEl;
         } else {
           observable.step(childModel, next);          
         }
@@ -334,7 +326,6 @@ export class SDOMInstance<Model, Msg, Elem extends Node> {
   }
 };
 
-
 declare module "./index" {
   export interface H<Model, Msg> {
     (name: string, ...rest: Array<Props<Model, Msg>|SDOM<Model, Msg>|string|number|((m: Model) => string)>): SDOM<Model, Msg, HTMLElement>;
@@ -349,7 +340,6 @@ h.text = text;
 h.array = array;
 h.discriminate = discriminate;
 h.dimap = dimap;
-
 
 export function isSDOM(input: any): input is SDOM<any, any> {
   return input && typeof(input.create) === 'function';
