@@ -1,6 +1,16 @@
-# Work-In-Progress, don't rely on this API
+[![Generic badge](https://img.shields.io/badge/status-experimental-red.svg)](https://shields.io/)
+## Explanation
+SDOM stands for Static DOM, just like VirtualDOM, SDOM is a
+declarative way of describing GUIs. SDOM solves performance problems
+in VirtualDOM by sacrificing some expressiveness. Basically, only the
+attributes and the contents of `Text` nodes can change over time, the
+    overall shape of DOM tree remains constant, thus Static DOM. The
+idea is by [Phil Freeman](https://github.com/paf31) see his
+[post](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
+and purescript
+[implementation](https://github.com/paf31/purescript-sdom).
 
-Virtual DOM vs SDOM aproach:
+Here is a pseudocode emphasising the difference between VirtualDOM and SDOM approach
 ```ts
 type Model = { text: string; active: boolean };
 
@@ -15,31 +25,26 @@ const sdom = h.div({ class: model => model.active ? 'active' : '' },
 );
 ```
 
-## Explanation
-`SDOM` stands for Static DOM, like VirtualDOM this is a declarative
-way of describing GUIs. SDOM solves performance problems in VirtualDOM
-by sacrificing some expressiveness. Basically, only the attributes and
-the contents of `Text` nodes can change over time, the overall shape
-of DOM tree remains constant, thus `Static DOM`. The idea is by [Phil
-Freeman](https://github.com/paf31) see his
-[post](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
-and purescript
-[implementation](https://github.com/paf31/purescript-sdom).
+## Installation
+```sh
+$ yarn add typescript-sdom
+```
 
 ## Simplest app
+demo: [https://lagunoff.github.io/typescript-sdom/simple/](https://lagunoff.github.io/typescript-sdom/simple/)
 ```ts
-import * as sdom from '../../src';
+import * as sdom from 'typescript-sdom';
 const h = sdom.create<Date, never>();
 
 const view = h.div(
   { style: `text-align: center` },
-  h.h1({ style: date => `color: ` + colors[date.getSeconds() % 6] }, 'Local time'),
+  h.h1('Local time', { style: date => `color: ` + colors[date.getSeconds() % 6] }),
   h.p(date => date.toString()),
 );
 
 const colors = ['#F44336', '#03A9F4', '#4CAF50', '#3F51B5', '#607D8B', '#FF5722'];
 const model = { value: new Date() };
-const el = view.create(sdom.observable.create(model), sdom.noop);
+const el = view.create(sdom.observable.create(model), msg => {});
 document.body.appendChild(el);
 setInterval(tick, 1000);
 
@@ -68,8 +73,8 @@ is the end-product of running `SDOM` component, in case of browser
 apps `El` is a subset of type `Node` (could be Text, HTMLDivElement
 etc), but the definition of `SDOM` is supposed to work in other
 settings as well by changing `El` parameter to the relevant type. The
-module [src/observable.ts](`src/observable.ts`) contains minimal
-implementation of subscription-based functionality for delaing with
+module [src/observable.ts](src/observable.ts) contains minimal
+implementation of subscription-based functionality for dealing with
 values that can change over time. `Observable<T>` and
 `ObservableValue<T>` are the most important definitions from that
 module. `ObservableValue<T>` is the source that contains changing
@@ -108,12 +113,23 @@ and also to setup notifications for future changes.
 - [https://github.com/paf31/purescript-sdom](https://github.com/paf31/purescript-sdom)
 - [https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
 
+## Todos
+ - [ ] Similar approach for non-web GUIs (ReactNative, QTQuick)
+ - [ ] Investigate the possibility of using generator-based effects in `update` e.g. [redux-saga](https://github.com/redux-saga/redux-saga), add examples
+ - [ ] Better API and docs for `src/observable.ts`
+ - [ ] Add benchmarks
+ - [ ] Improve performance for large arrays with https://github.com/ashaffer/mini-hamt
+
 ## API reference
 #### create
 
-`function create<Model, Action>(): H<Model, Action>;`
+`function create<Model, Msg>(): H<Model, Msg>;`
 
-Bind type parameters for `h`.
+Bind type parameters for `h`. This function does nothing at runtime
+and just returns `h` singleton which exposes all API with bound
+`Model` and `Msg` parameters. Without this typescript is not able
+to unify types if you use directly exported functions from the
+library. You dont need this in JS code.
 
 ```ts
  type Model = { counter: number };
@@ -133,8 +149,11 @@ Bind type parameters for `h`.
 
 `function h(name: string, ...rest: Array<string | number | Props<unknown, unknown, HTMLElement> | SUI<unknown, unknown, Node> | ((m: unknown) => string)>): SUI<unknown, unknown, HTMLElement>;`
 
-Shorthand for many API functions with bound `Model` and `Msg`
-parameters
+An alias for `elem`. Also a namespace for the most [common html
+tags](./src/html.ts) and all public API. All functions exposed by
+`h` have their `Model` and `Msg` parameters bound, see docs for
+`create`, see also [todomvc](examples/todomvc/src/index.ts) for
+usage examples
 
 #### attach
 
@@ -152,11 +171,11 @@ assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
 
 `function elem<Model, Msg>(name: string, ...rest: Array<string | number | Props<Model, Msg, HTMLElement> | SUI<Model, Msg, Node> | ((m: Model) => string)>): SUI<Model, Msg, HTMLElement>;`
 
-Create an html node
+Create an html node. Attributes and contents can go in any order
 
 ```ts
 const view = sdom.elem('a', { href: '#link' });
-const el = view.create(sdom.observable.of({}), sdom.noop);
+const el = view.create(sdom.observable.of({}), msg => {});
 assert.instanceOf(el, HTMLAnchorElement);
 assert.equal(el.hash, '#link');
 ```
@@ -189,7 +208,7 @@ const view = h.array('ul', { class: 'list' })(
   h => h.li(m => m.here),
 );
 const list = ['One', 'Two', 'Three', 'Four'];
-const el = view.create(sdom.observable.of({ list }), sdom.noop);
+const el = view.create(sdom.observable.of({ list }), msg => {});
 assert.instanceOf(el, HTMLUListElement);
 assert.equal(el.childNodes[3].innerHTML, 'Four');
 ```
@@ -201,39 +220,42 @@ assert.equal(el.childNodes[3].innerHTML, 'Four');
 Change both type parameters inside `SDOM<Model, Msg>`.
 
 ```ts
- type Model1 = { btnTitle: string };
- type Msg1 = { tag: 'Clicked' };
- type Model2 = string;
- type Msg2 = 'Clicked';
- let latestMsg: any = void 0;
- const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
- const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
- const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
- el.click();
- assert.instanceOf(el, HTMLButtonElement);
- assert.equal(el.textContent, 'Click on me');
- assert.deepEqual(latestMsg, { tag: 'Clicked' });
+type Model1 = { btnTitle: string };
+type Msg1 = { tag: 'Clicked' };
+type Model2 = string;
+type Msg2 = 'Clicked';
+let latestMsg: any = void 0;
+const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+el.click();
+assert.instanceOf(el, HTMLButtonElement);
+assert.equal(el.textContent, 'Click on me');
+assert.deepEqual(latestMsg, { tag: 'Clicked' });
 ```
 
 #### discriminate
 
-`function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, options: Record<K, SUI<Model, Msg, El>>): SUI<Model, Msg, El>;`
+`function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, alternatives: Record<K, SUI<Model, Msg, El>>): SUI<Model, Msg, El>;`
 
 Generic way to create `SDOM` which content depends on some
 condition on `Model`. First parameter checks this condition and
-returns a key which points to the current `SDOM` inside `options`
+returns the index that points to the current `SDOM` inside
+`alternatives`. This is useful for routing, tabs, etc. See also
+[variants](/examples/variants/index.ts) example with more
+convenient and more typesafe way of displaying union types
 
 ```ts
- type Tab = { tag: 'Details', info: string } | { tag: 'Comments', comments: string[] };
- type Model = { tab: Tab };
- const view = h.div(sdom.discriminate(m => m.tab.tag, {
-     Details: h.p({ id: 'details' }, m => m.tab.info),
-     Comments: h.p({ id: 'comments' }, m => m.tab.comments.join(', ')),
- }));
- const model = { value: { tab: { tag: 'Details', info: 'This product is awesome' } } };
- const el = view.create(sdom.observable.create(model), sdom.noop);
- assert.equal(el.childNodes[0].id, 'details'); 
- assert.equal(el.childNodes[0].textContent, 'This product is awesome');
- sdom.observable.step(model, { tab: { tag: 'Comments', comments: [] } });
- assert.equal(el.childNodes[0].id, 'comments');
+type Tab = 'Details'|'Comments';
+type Model = { tab: Tab, details: string; comments: string[] };
+const view = h.div(sdom.discriminate(m => m.tab, {
+    Details: h.p({ id: 'details' }, m => m.details),
+    Comments: h.p({ id: 'comments' }, m => m.comments.join(', ')),
+}));
+const model = { value: { tab: 'Details', details: 'This product is awesome', comments: [`No it's not`] } };
+const el = view.create(sdom.observable.create(model), sdom.noop);
+assert.equal(el.childNodes[0].id, 'details'); 
+assert.equal(el.childNodes[0].textContent, 'This product is awesome');
+sdom.observable.step(model, { ...model.value, tab: 'Comments' });
+assert.equal(el.childNodes[0].id, 'comments');
 ```

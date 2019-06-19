@@ -1,4 +1,4 @@
-import { h, SDOM } from './';
+import { h, SDOM } from './index';
 import { Props } from './props';
 
 declare module "./index" {
@@ -122,10 +122,10 @@ declare module "./index" {
   }
 }
 
-export type NamedH<Model, Action, Elem extends Node> = (...args: Array<Props<Model, Action, Elem>|SDOM<Model, Action>|string|number|((m: Model) => string)>) => SDOM<Model, Action, Elem>;
+export type NamedH<Model, Msg, Elem extends Node> = (...args: Array<Props<Model, Msg, Elem>|SDOM<Model, Msg>|string|number|((m: Model) => string)>) => SDOM<Model, Msg, Elem>;
 
-export type NamedH1<Model, Action, Elem = HTMLElement> = {
-  (...args: Array<Props<Model, Action, Elem>>): SDOM<Model, Action>;
+export type NamedH1<Model, Msg, Elem = HTMLElement> = {
+  (...args: Array<Props<Model, Msg, Elem>>): SDOM<Model, Msg>;
 };
 
 h.a = h.bind(void 0, 'a') as any;

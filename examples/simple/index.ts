@@ -3,7 +3,7 @@ const h = sdom.create<Date, never>();
 
 const view = h.div(
   { style: `text-align: center` },
-  h.h1({ style: date => `color: ` + colors[date.getSeconds() % 6] }, 'Local time'),
+  h.h1('Local time', { style: date => `color: ` + colors[date.getSeconds() % 6] }),
   h.p(date => date.toString()),
 );
 

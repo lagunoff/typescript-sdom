@@ -1,5 +1,4 @@
-import { attach, Nested } from '../../../src';
-import create from '../../../src';
+import { attach, Nested, create } from '../../../src/index';
 import * as todo from './todo';
 import { Prop } from '../../../src/props';
 import css from './css';
@@ -13,9 +12,6 @@ export type Model = {
   filter: Filter;
 };
 
-// Filter
-export type Filter = 'all'|'active'|'completed';
-
 // Msg
 export type Msg =
   | { tag: 'Input', value: string }
@@ -24,6 +20,9 @@ export type Msg =
   | { tag: 'KeyDown/enter' }
   | { tag: 'Hash/change', hash: string }
   | { tag: '@Todo', idx: number, msg: todo.Msg }
+
+// Filter
+export type Filter = 'all'|'active'|'completed';
 
 // Update
 export function update(msg: Msg, model: Model): Model {

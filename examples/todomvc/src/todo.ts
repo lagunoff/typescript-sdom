@@ -1,4 +1,4 @@
-import create from '../../../src';
+import create from '../../../src/index';
 
 const h = create<Props, Msg>();
 
@@ -8,6 +8,15 @@ export type Model = {
   completed: boolean;
   editing: string|null;
 };
+
+// Msg
+export type Msg =
+  | { tag: 'Completed' }
+  | { tag: 'Destroy' }
+  | { tag: 'Editing/on', event: MouseEvent }
+  | { tag: 'Editing/input', value: string }
+  | { tag: 'Editing/cancel' }
+  | { tag: 'Editing/commit' }
 
 // Extra fields to `Model` provided by parent component. Much like
 // props in ReactJS https://github.com/lagunoff/typescript-sdom/blob/fc943d5ff5297cbf64977f1e20275bf1d438a406/examples/todomvc/src/index.ts#L150
@@ -19,15 +28,6 @@ export type Props = Model & {
 export function init(title: string): Model {
   return { title, completed: false, editing: null };
 }
-
-// Msg
-export type Msg =
-  | { tag: 'Completed' }
-  | { tag: 'Destroy' }
-  | { tag: 'Editing/on', event: MouseEvent }
-  | { tag: 'Editing/input', value: string }
-  | { tag: 'Editing/cancel' }
-  | { tag: 'Editing/commit' }
 
 // Update
 export function update(msg: Msg, model: Model): Model {

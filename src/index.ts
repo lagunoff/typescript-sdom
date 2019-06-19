@@ -5,7 +5,11 @@ import { Observable, ObservableValue, observableMap, PrevNext } from './observab
 export { observable };
 
 /**
- * Bind type parameters for `h`.
+ * Bind type parameters for `h`. This function does nothing at runtime
+ * and just returns `h` singleton which exposes all API with bound
+ * `Model` and `Msg` parameters. Without this typescript is not able
+ * to unify types if you use directly exported functions from the
+ * library. You dont need this in JS code.
  * 
  *     type Model = { counter: number };
  *     type Msg = 'Click';
@@ -19,7 +23,7 @@ export { observable };
  *     assert.instanceOf(el.childNodes[0], HTMLParagraphElement);
  *     assert.instanceOf(el.childNodes[1], HTMLButtonElement);
  */
-export function create<Model, Action>(): H<Model, Action> {
+export function create<Model, Msg>(): H<Model, Msg> {
   return h as any;
 }
 
@@ -33,8 +37,11 @@ export interface H<Model, Msg> {
 }
 
 /**
- * Shorthand for many API functions with bound `Model` and `Msg`
- * parameters
+ * An alias for `elem`. Also a namespace for the most [common html
+ * tags](./src/html.ts) and all public API. All functions exposed by
+ * `h` have their `Model` and `Msg` parameters bound, see docs for
+ * `create`, see also [todomvc](examples/todomvc/src/index.ts) for
+ * usage examples
  */
 export const h = function h() {
   return elem.apply(void 0, arguments);
@@ -65,10 +72,10 @@ export function attach<Model, Msg, Elem extends Node>(view: SDOM<Model, Msg, Ele
 }
 
 /**
- * Create an html node
+ * Create an html node. Attributes and contents can go in any order
  * 
  *    const view = sdom.elem('a', { href: '#link' });
- *    const el = view.create(sdom.observable.of({}), sdom.noop);
+ *    const el = view.create(sdom.observable.of({}), msg => {});
  *    assert.instanceOf(el, HTMLAnchorElement);
  *    assert.equal(el.hash, '#link');
  */
@@ -169,7 +176,7 @@ export type Nested<Parent, Child> = { parent: Parent, here: Child };
  *      h => h.li(m => m.here),
  *    );
  *    const list = ['One', 'Two', 'Three', 'Four'];
- *    const el = view.create(sdom.observable.of({ list }), sdom.noop);
+ *    const el = view.create(sdom.observable.of({ list }), msg => {});
  *    assert.instanceOf(el, HTMLUListElement);
  *    assert.equal(el.childNodes[3].innerHTML, 'Four');
  */
@@ -240,18 +247,18 @@ export function array<Model, Msg>(name: string, props: Props<Model, Msg> = {}): 
 /**
  * Change both type parameters inside `SDOM<Model, Msg>`.
  * 
- *     type Model1 = { btnTitle: string };
- *     type Msg1 = { tag: 'Clicked' };
- *     type Model2 = string;
- *     type Msg2 = 'Clicked';
- *     let latestMsg: any = void 0;
- *     const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
- *     const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
- *     const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
- *     el.click();
- *     assert.instanceOf(el, HTMLButtonElement);
- *     assert.equal(el.textContent, 'Click on me');
- *     assert.deepEqual(latestMsg, { tag: 'Clicked' });
+ *    type Model1 = { btnTitle: string };
+ *    type Msg1 = { tag: 'Clicked' };
+ *    type Model2 = string;
+ *    type Msg2 = 'Clicked';
+ *    let latestMsg: any = void 0;
+ *    const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+ *    const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+ *    const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+ *    el.click();
+ *    assert.instanceOf(el, HTMLButtonElement);
+ *    assert.equal(el.textContent, 'Click on me');
+ *    assert.deepEqual(latestMsg, { tag: 'Clicked' });
  */
 export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): <UI>(s: SUI<M1, A1, UI>) => SUI<M2, A2, UI> {
   return sui => {
@@ -266,28 +273,31 @@ export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2
 /**
  * Generic way to create `SDOM` which content depends on some
  * condition on `Model`. First parameter checks this condition and
- * returns a key which points to the current `SDOM` inside `options`
+ * returns the index that points to the current `SDOM` inside
+ * `alternatives`. This is useful for routing, tabs, etc. See also
+ * [variants](/examples/variants/index.ts) example with more
+ * convenient and more typesafe way of displaying union types
  * 
- *     type Tab = { tag: 'Details', info: string } | { tag: 'Comments', comments: string[] };
- *     type Model = { tab: Tab };
- *     const view = h.div(sdom.discriminate(m => m.tab.tag, {
- *         Details: h.p({ id: 'details' }, m => m.tab.info),
- *         Comments: h.p({ id: 'comments' }, m => m.tab.comments.join(', ')),
- *     }));
- *     const model = { value: { tab: { tag: 'Details', info: 'This product is awesome' } } };
- *     const el = view.create(sdom.observable.create(model), sdom.noop);
- *     assert.equal(el.childNodes[0].id, 'details'); 
- *     assert.equal(el.childNodes[0].textContent, 'This product is awesome');
- *     sdom.observable.step(model, { tab: { tag: 'Comments', comments: [] } });
- *     assert.equal(el.childNodes[0].id, 'comments'); 
+ *    type Tab = 'Details'|'Comments';
+ *    type Model = { tab: Tab, details: string; comments: string[] };
+ *    const view = h.div(sdom.discriminate(m => m.tab, {
+ *        Details: h.p({ id: 'details' }, m => m.details),
+ *        Comments: h.p({ id: 'comments' }, m => m.comments.join(', ')),
+ *    }));
+ *    const model = { value: { tab: 'Details', details: 'This product is awesome', comments: [`No it's not`] } };
+ *    const el = view.create(sdom.observable.create(model), sdom.noop);
+ *    assert.equal(el.childNodes[0].id, 'details'); 
+ *    assert.equal(el.childNodes[0].textContent, 'This product is awesome');
+ *    sdom.observable.step(model, { ...model.value, tab: 'Comments' });
+ *    assert.equal(el.childNodes[0].id, 'comments'); 
  */
-export function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, options: Record<K, SDOM<Model, Msg, El>>): SDOM<Model, Msg, El> {
+export function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, alternatives: Record<K, SDOM<Model, Msg, El>>): SDOM<Model, Msg, El> {
   return {
     // Create new node
     create(o, sink) {
       const key = discriminator(o.getValue());
       const childModel: ObservableValue<any> = observable.valueOf(o.getValue());
-      let el = options[key].create(observable.create(childModel), sink);
+      let el = alternatives[key].create(observable.create(childModel), sink);
       o.subscribe(onNext, onComplete);
       return el;
       
@@ -299,7 +309,7 @@ export function discriminate<Model, Msg, El extends Node, K extends string>(disc
           // Key is changed, so we don't update but switch to the new node
           observable.complete(childModel);
           observable.step(childModel, next);
-          const nextEl = options[nextKey].create(observable.create(childModel), sink);
+          const nextEl = alternatives[nextKey].create(observable.create(childModel), sink);
           el.parentNode!.replaceChild(nextEl, el);
           el = nextEl;
         } else {

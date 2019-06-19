@@ -1,6 +1,16 @@
-# Work-In-Progress, don't rely on this API
+[![Generic badge](https://img.shields.io/badge/status-experimental-red.svg)](https://shields.io/)
+## Explanation
+SDOM stands for Static DOM, just like VirtualDOM, SDOM is a
+declarative way of describing GUIs. SDOM solves performance problems
+in VirtualDOM by sacrificing some expressiveness. Basically, only the
+attributes and the contents of `Text` nodes can change over time, the
+    overall shape of DOM tree remains constant, thus Static DOM. The
+idea is by [Phil Freeman](https://github.com/paf31) see his
+[post](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
+and purescript
+[implementation](https://github.com/paf31/purescript-sdom).
 
-Virtual DOM vs SDOM aproach:
+Here is a pseudocode emphasising the difference between VirtualDOM and SDOM approach
 ```ts
 type Model = { text: string; active: boolean };
 
@@ -15,31 +25,26 @@ const sdom = h.div({ class: model => model.active ? 'active' : '' },
 );
 ```
 
-## Explanation
-`SDOM` stands for Static DOM, like VirtualDOM this is a declarative
-way of describing GUIs. SDOM solves performance problems in VirtualDOM
-by sacrificing some expressiveness. Basically, only the attributes and
-the contents of `Text` nodes can change over time, the overall shape
-of DOM tree remains constant, thus `Static DOM`. The idea is by [Phil
-Freeman](https://github.com/paf31) see his
-[post](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
-and purescript
-[implementation](https://github.com/paf31/purescript-sdom).
+## Installation
+```sh
+$ yarn add typescript-sdom
+```
 
 ## Simplest app
+demo: [https://lagunoff.github.io/typescript-sdom/simple/](https://lagunoff.github.io/typescript-sdom/simple/)
 ```ts
-import * as sdom from '../../src';
+import * as sdom from 'typescript-sdom';
 const h = sdom.create<Date, never>();
 
 const view = h.div(
   { style: `text-align: center` },
-  h.h1({ style: date => `color: ` + colors[date.getSeconds() % 6] }, 'Local time'),
+  h.h1('Local time', { style: date => `color: ` + colors[date.getSeconds() % 6] }),
   h.p(date => date.toString()),
 );
 
 const colors = ['#F44336', '#03A9F4', '#4CAF50', '#3F51B5', '#607D8B', '#FF5722'];
 const model = { value: new Date() };
-const el = view.create(sdom.observable.create(model), sdom.noop);
+const el = view.create(sdom.observable.create(model), msg => {});
 document.body.appendChild(el);
 setInterval(tick, 1000);
 
@@ -68,8 +73,8 @@ is the end-product of running `SDOM` component, in case of browser
 apps `El` is a subset of type `Node` (could be Text, HTMLDivElement
 etc), but the definition of `SDOM` is supposed to work in other
 settings as well by changing `El` parameter to the relevant type. The
-module [src/observable.ts](`src/observable.ts`) contains minimal
-implementation of subscription-based functionality for delaing with
+module [src/observable.ts](src/observable.ts) contains minimal
+implementation of subscription-based functionality for dealing with
 values that can change over time. `Observable<T>` and
 `ObservableValue<T>` are the most important definitions from that
 module. `ObservableValue<T>` is the source that contains changing
@@ -107,6 +112,13 @@ and also to setup notifications for future changes.
 ## Links
 - [https://github.com/paf31/purescript-sdom](https://github.com/paf31/purescript-sdom)
 - [https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html)
+
+## Todos
+ - [ ] Similar approach for non-web GUIs (ReactNative, QTQuick)
+ - [ ] Investigate the possibility of using generator-based effects in `update` e.g. [redux-saga](https://github.com/redux-saga/redux-saga), add examples
+ - [ ] Better API and docs for `src/observable.ts`
+ - [ ] Add benchmarks
+ - [ ] Improve performance for large arrays with https://github.com/ashaffer/mini-hamt
 
 ## API reference
 <%= TS_NODE_TRANSPILE_ONLY=true ts-node scripts/gendocs.ts src/index.ts %>
