@@ -28,14 +28,14 @@ export function of<T>(value: T): Observable<T> {
   return create({ value, subscriptions: [] });
 }
 
-export function step<T>(v: ObservableValue<T>, next: T): void {
+export function next<T>(v: ObservableValue<T>, next: T): void {
   const change = { prev: v.value, next };
   v.subscriptions && v.subscriptions.forEach(s => s.onNext(change));
   v.value = next;
 }
 
 export function modify<T>(v: ObservableValue<T>, proj: (prev: T) => T): void {
-  return step(v, proj(v.value));
+  return next(v, proj(v.value));
 }
 
 export function complete<T>(v: ObservableValue<T>): void {

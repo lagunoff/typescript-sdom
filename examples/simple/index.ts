@@ -14,5 +14,5 @@ document.body.appendChild(el);
 setInterval(tick, 1000);
 
 function tick() {
-  sdom.observable.step(model, new Date());
+  sdom.observable.next(model, new Date());
 }

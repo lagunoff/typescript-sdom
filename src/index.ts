@@ -229,7 +229,7 @@ export function array<Model, Msg>(name: string, props: Props<Model, Msg> = {}): 
                 lastInserted = nextEl;
               }            
             } else {
-              observable.step(childModels[i], { here: xs[i], parent: next });
+              observable.next(childModels[i], { here: xs[i], parent: next });
             }
           }
         }
@@ -260,11 +260,14 @@ export function array<Model, Msg>(name: string, props: Props<Model, Msg> = {}): 
  *    assert.equal(el.textContent, 'Click on me');
  *    assert.deepEqual(latestMsg, { tag: 'Clicked' });
  */
-export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): <UI>(s: SUI<M1, A1, UI>) => SUI<M2, A2, UI> {
-  return sui => {
+export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): <UI>(s: SUI<M1, A1, UI>) => SUI<M2, A2, UI>;
+export function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): <UI>(s: (h: H<M1, A1>) => SUI<M1, A1, UI>) => SUI<M2, A2, UI>;
+export function dimap(coproj, proj) {
+  return s => {
+    const sdom = isSDOM(s) ? s : s(h);
     return {
       create(o, sink) {
-        return sui.create(observableMap(coproj, o), a => sink(proj(a)));
+        return sdom.create(observableMap(coproj, o), a => sink(proj(a)));
       },
     };
   };
@@ -308,12 +311,12 @@ export function discriminate<Model, Msg, El extends Node, K extends string>(disc
         if (prevKey !== nextKey) {
           // Key is changed, so we don't update but switch to the new node
           observable.complete(childModel);
-          observable.step(childModel, next);
+          observable.next(childModel, next);
           const nextEl = alternatives[nextKey].create(observable.create(childModel), sink);
           el.parentNode!.replaceChild(nextEl, el);
           el = nextEl;
         } else {
-          observable.step(childModel, next);          
+          observable.next(childModel, next);          
         }
       }
 
@@ -360,7 +363,7 @@ export class SDOMInstance<Model, Msg, Elem extends Node> {
       case 'PENDING_REQUEST':
         rAF(this.updateIfNeeded);
         this.state = 'EXTRA_REQUEST';
-        observable.step(this.model, this.currentModel);
+        observable.next(this.model, this.currentModel);
         return;
 
       case 'EXTRA_REQUEST':

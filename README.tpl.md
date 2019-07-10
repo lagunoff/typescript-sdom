@@ -33,7 +33,7 @@ $ yarn add typescript-sdom
 ## Simplest app
 demo: [https://lagunoff.github.io/typescript-sdom/simple/](https://lagunoff.github.io/typescript-sdom/simple/)
 ```ts
-import * as sdom from 'typescript-sdom';
+import * as sdom from '../../src';
 const h = sdom.create<Date, never>();
 
 const view = h.div(
@@ -44,12 +44,12 @@ const view = h.div(
 
 const colors = ['#F44336', '#03A9F4', '#4CAF50', '#3F51B5', '#607D8B', '#FF5722'];
 const model = { value: new Date() };
-const el = view.create(sdom.observable.create(model), msg => {});
+const el = view.create(sdom.observable.create(model), sdom.noop);
 document.body.appendChild(el);
 setInterval(tick, 1000);
 
 function tick() {
-  sdom.observable.step(model, new Date());
+  sdom.observable.next(model, new Date());
 }
 ```
 
