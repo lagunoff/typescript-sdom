@@ -128,7 +128,7 @@ export type NamedH1<Model, Msg, Elem = HTMLElement> = {
   (...args: Array<Props<Model, Msg, Elem>>): SDOM<Model, Msg>;
 };
 
-h.a = h.bind(void 0, 'a') as any;
+h.a = h.bind(void 0, 'a', { href: 'javascript://void 0' }) as any;
 h.abbr = h.bind(void 0, 'abbr') as any;
 h.address = h.bind(void 0, 'address') as any;
 h.applet = h.bind(void 0, 'applet') as any;
