@@ -151,7 +151,7 @@ export function elem<Model, Msg>(name: string, ...rest: Array<Props<Model, Msg>|
  *    const el = view.create(sdom.observable.create(model), sdom.noop);
  *    assert.instanceOf(el, Text);
  *    assert.equal(el.nodeValue, 'You have 0 unread messages');
- *    sdom.observable.step(model, 5);
+ *    sdom.observable.next(model, 5);
  *    assert.equal(el.nodeValue, 'You have 5 unread messages');
  */
 export function text<Model, Msg>(value: string|number|((m: Model) => string|number)): SDOM<Model, Msg, Text> {
@@ -291,7 +291,7 @@ export function dimap(coproj, proj) {
  *    const el = view.create(sdom.observable.create(model), sdom.noop);
  *    assert.equal(el.childNodes[0].id, 'details'); 
  *    assert.equal(el.childNodes[0].textContent, 'This product is awesome');
- *    sdom.observable.step(model, { ...model.value, tab: 'Comments' });
+ *    sdom.observable.next(model, { ...model.value, tab: 'Comments' });
  *    assert.equal(el.childNodes[0].id, 'comments'); 
  */
 export function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, alternatives: Record<K, SDOM<Model, Msg, El>>): SDOM<Model, Msg, El> {

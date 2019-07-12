@@ -45,7 +45,7 @@ describe("text", () => {
     const el = view.create(sdom.observable.create(model), sdom.noop);
     assert.instanceOf(el, Text);
     assert.equal(el.nodeValue, 'You have 0 unread messages');
-    sdom.observable.step(model, 5);
+    sdom.observable.next(model, 5);
     assert.equal(el.nodeValue, 'You have 5 unread messages');
   });
 });
@@ -80,6 +80,40 @@ describe("dimap", () => {
   });
 });
 
+describe("dimap", () => {
+  it('test #1', () => {
+    type Model1 = { btnTitle: string };
+    type Msg1 = { tag: 'Clicked' };
+    type Model2 = string;
+    type Msg2 = 'Clicked';
+    let latestMsg: any = void 0;
+    const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+    const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+    const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+    el.click();
+    assert.instanceOf(el, HTMLButtonElement);
+    assert.equal(el.textContent, 'Click on me');
+    assert.deepEqual(latestMsg, { tag: 'Clicked' });
+  });
+});
+
+describe("dimap", () => {
+  it('test #1', () => {
+    type Model1 = { btnTitle: string };
+    type Msg1 = { tag: 'Clicked' };
+    type Model2 = string;
+    type Msg2 = 'Clicked';
+    let latestMsg: any = void 0;
+    const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+    const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+    const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+    el.click();
+    assert.instanceOf(el, HTMLButtonElement);
+    assert.equal(el.textContent, 'Click on me');
+    assert.deepEqual(latestMsg, { tag: 'Clicked' });
+  });
+});
+
 describe("discriminate", () => {
   it('test #1', () => {
     type Tab = 'Details'|'Comments';
@@ -92,7 +126,7 @@ describe("discriminate", () => {
     const el = view.create(sdom.observable.create(model), sdom.noop);
     assert.equal(el.childNodes[0].id, 'details'); 
     assert.equal(el.childNodes[0].textContent, 'This product is awesome');
-    sdom.observable.step(model, { ...model.value, tab: 'Comments' });
+    sdom.observable.next(model, { ...model.value, tab: 'Comments' });
     assert.equal(el.childNodes[0].id, 'comments');
   });
 });
