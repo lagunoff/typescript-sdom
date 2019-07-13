@@ -1,13 +1,13 @@
 export type Unlisten = () => void;
 export type Subscribe<T> = (onNext: (x: T) => void, onComplete: () => void) => Unlisten;
 export type Subscription<T> = { onNext: (x: T) => void; onComplete: () => void; };
-export type PrevNext<T> = { prev: T; next: T; };
-export type ObservableValue<T> = { value: T; subscriptions?: Subscription<PrevNext<T>>[]; };
-export type Observable<T> = { subscribe: Subscribe<PrevNext<T>>; getValue(): T; };
+export type Updates<T> = { prev: T; next: T; };
+export type ObservableValue<T> = { value: T; subscriptions?: Subscription<Updates<T>>[]; };
+export type Observable<T> = { subscribe: Subscribe<Updates<T>>; getValue(): T; };
 
 export function create<T>(v: ObservableValue<T>): Observable<T> {
   const getValue = () => v.value;
-  const subscribe: Subscribe<PrevNext<T>> = (onNext, onComplete) => {
+  const subscribe: Subscribe<Updates<T>> = (onNext, onComplete) => {
     const subscription = { onNext, onComplete };
     v.subscriptions = v.subscriptions || [];
     v.subscriptions.push(subscription);

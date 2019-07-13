@@ -1,6 +1,6 @@
 import { Props, attributes } from './props'
 import * as observable from './observable';
-import { Observable, ObservableValue, observableMap, PrevNext } from './observable';
+import { Observable, ObservableValue, observableMap, Updates } from './observable';
 
 export { observable };
 
@@ -130,7 +130,7 @@ export function elem<Model, Msg>(name: string, ...rest: Array<Props<Model, Msg>|
       return el;
 
       // Update existing element
-      function onNext({ next }: PrevNext<Model>) {
+      function onNext({ next }: Updates<Model>) {
         dynamicProps.forEach(([k, fn]) => el[k] = fn(next));
         dynamicAttrs.forEach(([k, fn]) => el.setAttribute(k, fn(next)));
       }
@@ -203,7 +203,7 @@ export function array<Model, Msg>(name: string, props: Props<Model, Msg> = {}): 
         
         return el;
 
-        function onNext({ prev, next }: PrevNext<Model>) {
+        function onNext({ prev, next }: Updates<Model>) {
           const xs = selector(next);
           const xsPrev = selector(prev);
           let lastInserted: Node|null = null;
@@ -305,7 +305,7 @@ export function discriminate<Model, Msg, El extends Node, K extends string>(disc
       return el;
       
       // Update existing text node
-      function onNext({ prev, next }: PrevNext<Model>) {
+      function onNext({ prev, next }: Updates<Model>) {
         const prevKey = discriminator(prev);
         const nextKey = discriminator(next);
         if (prevKey !== nextKey) {

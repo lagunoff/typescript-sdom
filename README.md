@@ -192,7 +192,7 @@ const model = { value: 0 };
 const el = view.create(sdom.observable.create(model), sdom.noop);
 assert.instanceOf(el, Text);
 assert.equal(el.nodeValue, 'You have 0 unread messages');
-sdom.observable.step(model, 5);
+sdom.observable.next(model, 5);
 assert.equal(el.nodeValue, 'You have 5 unread messages');
 ```
 
@@ -257,6 +257,6 @@ const model = { value: { tab: 'Details', details: 'This product is awesome', com
 const el = view.create(sdom.observable.create(model), sdom.noop);
 assert.equal(el.childNodes[0].id, 'details'); 
 assert.equal(el.childNodes[0].textContent, 'This product is awesome');
-sdom.observable.step(model, { ...model.value, tab: 'Comments' });
+sdom.observable.next(model, { ...model.value, tab: 'Comments' });
 assert.equal(el.childNodes[0].id, 'comments');
 ```
