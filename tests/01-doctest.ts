@@ -15,7 +15,7 @@ describe("create", () => {
          h.button('Click here', { onclick: () => 'Click' }),
      );
      const model = { value: { counter: 0 } };
-     const el = view.create(sdom.observable.create(model), sdom.noop);
+     const el = view.create(sdom.store.create(model), sdom.noop);
      assert.instanceOf(el.childNodes[0], HTMLParagraphElement);
      assert.instanceOf(el.childNodes[1], HTMLButtonElement);
   });
@@ -29,10 +29,10 @@ describe("attach", () => {
   });
 });
 
-describe("elem", () => {
+describe("element", () => {
   it('test #1', () => {
-    const view = sdom.elem('a', { href: '#link' });
-    const el = view.create(sdom.observable.of({}), msg => {});
+    const view = sdom.element('a', { href: '#link' });
+    const el = view.create(sdom.store.of({}), msg => {});
     assert.instanceOf(el, HTMLAnchorElement);
     assert.equal(el.hash, '#link');
   });
@@ -42,10 +42,10 @@ describe("text", () => {
   it('test #1', () => {
     const view = sdom.text(n => `You have ${n} unread messages`);
     const model = { value: 0 };
-    const el = view.create(sdom.observable.create(model), sdom.noop);
+    const el = view.create(sdom.store.create(model), sdom.noop);
     assert.instanceOf(el, Text);
     assert.equal(el.nodeValue, 'You have 0 unread messages');
-    sdom.observable.next(model, 5);
+    sdom.store.next(model, 5);
     assert.equal(el.nodeValue, 'You have 5 unread messages');
   });
 });
@@ -57,60 +57,9 @@ describe("array", () => {
       h => h.li(m => m.here),
     );
     const list = ['One', 'Two', 'Three', 'Four'];
-    const el = view.create(sdom.observable.of({ list }), msg => {});
+    const el = view.create(sdom.store.of({ list }), msg => {});
     assert.instanceOf(el, HTMLUListElement);
     assert.equal(el.childNodes[3].innerHTML, 'Four');
-  });
-});
-
-describe("dimap", () => {
-  it('test #1', () => {
-    type Model1 = { btnTitle: string };
-    type Msg1 = { tag: 'Clicked' };
-    type Model2 = string;
-    type Msg2 = 'Clicked';
-    let latestMsg: any = void 0;
-    const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
-    const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
-    const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
-    el.click();
-    assert.instanceOf(el, HTMLButtonElement);
-    assert.equal(el.textContent, 'Click on me');
-    assert.deepEqual(latestMsg, { tag: 'Clicked' });
-  });
-});
-
-describe("dimap", () => {
-  it('test #1', () => {
-    type Model1 = { btnTitle: string };
-    type Msg1 = { tag: 'Clicked' };
-    type Model2 = string;
-    type Msg2 = 'Clicked';
-    let latestMsg: any = void 0;
-    const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
-    const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
-    const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
-    el.click();
-    assert.instanceOf(el, HTMLButtonElement);
-    assert.equal(el.textContent, 'Click on me');
-    assert.deepEqual(latestMsg, { tag: 'Clicked' });
-  });
-});
-
-describe("dimap", () => {
-  it('test #1', () => {
-    type Model1 = { btnTitle: string };
-    type Msg1 = { tag: 'Clicked' };
-    type Model2 = string;
-    type Msg2 = 'Clicked';
-    let latestMsg: any = void 0;
-    const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
-    const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
-    const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
-    el.click();
-    assert.instanceOf(el, HTMLButtonElement);
-    assert.equal(el.textContent, 'Click on me');
-    assert.deepEqual(latestMsg, { tag: 'Clicked' });
   });
 });
 
@@ -123,10 +72,10 @@ describe("discriminate", () => {
         Comments: h.p({ id: 'comments' }, m => m.comments.join(', ')),
     }));
     const model = { value: { tab: 'Details', details: 'This product is awesome', comments: [`No it's not`] } };
-    const el = view.create(sdom.observable.create(model), sdom.noop);
+    const el = view.create(sdom.store.create(model), sdom.noop);
     assert.equal(el.childNodes[0].id, 'details'); 
     assert.equal(el.childNodes[0].textContent, 'This product is awesome');
-    sdom.observable.next(model, { ...model.value, tab: 'Comments' });
+    sdom.store.next(model, { ...model.value, tab: 'Comments' });
     assert.equal(el.childNodes[0].id, 'comments');
   });
 });

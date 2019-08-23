@@ -1,6 +1,6 @@
-import create from '../../../src/index';
-
-const h = create<Props, Msg>();
+import * as sdom from '../../../src/index';
+import { Nested } from '../../../src/index';
+import { MakeProps, withInterpreter, simpleInterpreter, withDefault } from './component';
 
 // Model
 export type Model = {
@@ -8,6 +8,11 @@ export type Model = {
   completed: boolean;
   editing: string|null;
 };
+
+// Extra data provided by parent component. Much like props in ReactJS
+export type Props<Ctx> = MakeProps<Ctx, Model, {
+  hidden: boolean;
+}>;
 
 // Msg
 export type Msg =
@@ -17,12 +22,6 @@ export type Msg =
   | { tag: 'Editing/input', value: string }
   | { tag: 'Editing/cancel' }
   | { tag: 'Editing/commit' }
-
-// Extra fields to `Model` provided by parent component. Much like
-// props in ReactJS https://github.com/lagunoff/typescript-sdom/blob/fc943d5ff5297cbf64977f1e20275bf1d438a406/examples/todomvc/src/index.ts#L150
-export type Props = Model & {
-  hidden: boolean;
-}
 
 // Init
 export function init(title: string): Model {
@@ -49,36 +48,45 @@ export function update(msg: Msg, model: Model): Model {
   }
 }
 
-const rootClass = (m: Props) => [m.completed ? 'completed' : '', m.editing !== null ? 'editing' : ''].filter(Boolean).join(' ');
-const rootStyle = (m: Props) => m.hidden ? 'display: none;' : '';
-
 // View
-export const view = h.li(
-  { className: rootClass, style: rootStyle },
+export function view<Ctx>(props: Props<Ctx>) {
+  type PublicModel = Nested<Ctx, Model>;
+  
+  const h = sdom.create<PublicModel, Msg>();
+  const rootClass = (m: PublicModel) => [m.here.completed ? 'completed' : '', m.here.editing !== null ? 'editing' : ''].filter(Boolean).join(' ');
+  const rootStyle = (m: PublicModel) => props.hidden(m) ? 'display: none;' : '';
 
-  h.div(
-    { className: 'view', ondblclick: event => ({ tag: 'Editing/on', event }) },
+  return h.li(
+    { className: rootClass, style: rootStyle },
+
+    h.div(
+      { className: 'view', ondblclick: event => ({ tag: 'Editing/on', event }) },
+      
+      h.input({
+        className: 'toggle',
+        type: 'checkbox',
+        checked: m => m.here.completed,
+        onclick: { tag: 'Completed' },
+      }),
+      
+      h.label(m => m.here.title),
+      
+      h.button({ className: 'destroy', onclick: { tag: 'Destroy' } }),
+    ),
     
     h.input({
-      className: 'toggle',
-      type: 'checkbox',
-      checked: m => m.completed,
-      onclick: () => ({ tag: 'Completed' }),
+      className: 'edit',
+      value: m => m.here.editing !== null ? m.here.editing : m.here.title,
+      oninput: e => ({ tag: 'Editing/input', value: e.currentTarget.value }),
+      onblur: { tag: 'Editing/commit' },
+      onkeydown: handleKeydown,
     }),
-    
-    h.label(m => m.title),
-    
-    h.button({ className: 'destroy', onclick: () => ({ tag: 'Destroy' }) }),
-  ),
-  
-  h.input({
-    className: 'edit',
-    value: m => m.editing !== null ? m.editing : m.title,
-    oninput: e => ({ tag: 'Editing/input', value: e.currentTarget.value }),
-    onblur: () => ({ tag: 'Editing/commit' }),
-    onkeydown: handleKeydown,
-  }),
-);
+  );
+}
+
+export const interpereter = simpleInterpreter(update);
+
+export default withDefault(0 as any as Model)(withInterpreter(interpereter)(view));
 
 function handleKeydown(event: KeyboardEvent): Msg|void {
   if (event.keyCode === KEY_ENTER) return { tag: 'Editing/commit' };

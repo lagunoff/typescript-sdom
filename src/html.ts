@@ -1,5 +1,4 @@
-import { h, SDOM } from './index';
-import { Props } from './props';
+import { h, SDOM, ElementContent, Many } from './index';
 
 declare module "./index" {
   export interface H<Model, Msg> {
@@ -122,10 +121,10 @@ declare module "./index" {
   }
 }
 
-export type NamedH<Model, Msg, Elem extends Node> = (...args: Array<Props<Model, Msg, Elem>|SDOM<Model, Msg>|string|number|((m: Model) => string)>) => SDOM<Model, Msg, Elem>;
+export type NamedH<Model, Msg, Elem extends Node = HTMLElement> = (...args: Many<ElementContent<Model, Msg, Elem>>[]) => SDOM<Model, Msg, Elem>;
 
-export type NamedH1<Model, Msg, Elem = HTMLElement> = {
-  (...args: Array<Props<Model, Msg, Elem>>): SDOM<Model, Msg>;
+export type NamedH1<Model, Msg, Elem extends Node = HTMLElement> = {
+  (...args: Array<Props<Model, Msg, Elem>>): SDOM<Model, Msg, Elem>;
 };
 
 h.a = h.bind(void 0, 'a', { href: 'javascript://void 0' }) as any;
@@ -244,3 +243,182 @@ h.ul = h.bind(void 0, 'ul') as any;
 h.var = h.bind(void 0, 'var') as any;
 h.video = h.bind(void 0, 'video') as any;
 h.wbr = h.bind(void 0, 'wbr') as any;
+
+export type Prop<Model, T, Elem> = T|((m: Model, el: Elem) => T);
+export type EventProp<Model, Msg, Ev extends Event, Elem> = Msg|((e: WithTarget<Ev, Elem>, m: Model) => Msg|void);
+export type WithTarget<Ev extends Event, Target> = Omit<Ev, 'currentTarget'> & { currentTarget: Target };
+
+export type Props<Model, Msg, Elem = HTMLElement> = {
+  className?: Prop<Model, string, Elem>;
+  class?: Prop<Model, string, Elem>;
+  style?: Prop<Model, string, Elem>;
+  classList?: Record<string, boolean|((m: Model) => boolean)>
+  title?: Prop<Model, string, Elem>;
+  selected?: Prop<Model, boolean, Elem>;
+  hidden?: Prop<Model, boolean, Elem>;
+  value?: Prop<Model, string, Elem>;
+  defaultValue?: Prop<Model, string, Elem>;
+  accept?: Prop<Model, string, Elem>;
+  acceptCharset?: Prop<Model, string, Elem>;
+  action?: Prop<Model, string, Elem>;
+  autocomplete?: Prop<Model, 'on'|'off', Elem>;
+  autosave?: Prop<Model, string, Elem>;
+  disabled?: Prop<Model, boolean, Elem>;
+  enctype?: Prop<Model, string, Elem>;
+  formation?: Prop<Model, string, Elem>;
+  list?: Prop<Model, string, Elem>;
+  maxlength?: Prop<Model, string, Elem>;
+  minlength?: Prop<Model, string, Elem>;
+  method?: Prop<Model, string, Elem>;
+  multiple?: Prop<Model, boolean, Elem>;
+  novalidate?: Prop<Model, boolean, Elem>;
+  pattern?: Prop<Model, string, Elem>;
+  readonly?: Prop<Model, boolean, Elem>;
+  required?: Prop<Model, boolean, Elem>;
+  size?: Prop<Model, string, Elem>;
+  for?: Prop<Model, string, Elem>;
+  form?: Prop<Model, string, Elem>;
+  max?: Prop<Model, string, Elem>;
+  min?: Prop<Model, string, Elem>;
+  step?: Prop<Model, string, Elem>;
+  cols?: Prop<Model, string, Elem>;
+  rows?: Prop<Model, string, Elem>;
+  wrap?: Prop<Model, string, Elem>;
+  target?: Prop<Model, string, Elem>;
+  download?: Prop<Model, string, Elem>;
+  poster?: Prop<Model, string, Elem>;
+  downloadAs?: Prop<Model, string, Elem>;
+  hreflang?: Prop<Model, string, Elem>;
+  media?: Prop<Model, string, Elem>;
+  ping?: Prop<Model, string, Elem>;
+  rel?: Prop<Model, string, Elem>;
+  ismap?: Prop<Model, string, Elem>;
+  usemap?: Prop<Model, string, Elem>;
+  shape?: Prop<Model, string, Elem>;
+  coords?: Prop<Model, string, Elem>;
+  src?: Prop<Model, string, Elem>;
+  height?: Prop<Model, string, Elem>;
+  width?: Prop<Model, string, Elem>;
+  alt?: Prop<Model, string, Elem>;
+  autoplay?: Prop<Model, string, Elem>;
+  controls?: Prop<Model, boolean, Elem>;
+  loop?: Prop<Model, boolean, Elem>;
+  preload?: Prop<Model, string, Elem>;
+  default?: Prop<Model, boolean, Elem>;
+  kind?: Prop<Model, string, Elem>;
+  srclang?: Prop<Model, string, Elem>;
+  sandbox?: Prop<Model, string, Elem>;
+  seamless?: Prop<Model, string, Elem>;
+  srcdoc?: Prop<Model, string, Elem>;
+  reversed?: Prop<Model, string, Elem>;
+  start?: Prop<Model, string, Elem>;
+  align?: Prop<Model, string, Elem>;
+  colspan?: Prop<Model, string, Elem>;
+  rowspan?: Prop<Model, string, Elem>;
+  headers?: Prop<Model, string, Elem>;
+  scope?: Prop<Model, string, Elem>;
+  async?: Prop<Model, boolean, Elem>;
+  charset?: Prop<Model, string, Elem>;
+  content?: Prop<Model, string, Elem>;
+  defer?: Prop<Model, string, Elem>;
+  httpEquiv?: Prop<Model, string, Elem>;
+  language?: Prop<Model, string, Elem>;
+  scoped?: Prop<Model, string, Elem>;
+  type?: Prop<Model, string, Elem>;
+  name?: Prop<Model, string, Elem>;
+  href?: Prop<Model, string, Elem>;
+  id?: Prop<Model, string, Elem>;
+  placeholder?: Prop<Model, string, Elem>;
+  checked?: Prop<Model, boolean, Elem>;
+  autofocus?: Prop<Model, boolean, Elem>;
+
+  // Element events
+  onabort?: EventProp<Model, Msg, HTMLElementEventMap['abort'], Elem>;
+  onanimationcancel?: EventProp<Model, Msg, HTMLElementEventMap['animationcancel'], Elem>;
+  onanimationend?: EventProp<Model, Msg, HTMLElementEventMap['animationend'], Elem>;
+  onanimationiteration?: EventProp<Model, Msg, HTMLElementEventMap['animationiteration'], Elem>;
+  onanimationstart?: EventProp<Model, Msg, HTMLElementEventMap['animationstart'], Elem>;
+  onauxclick?: EventProp<Model, Msg, HTMLElementEventMap['auxclick'], Elem>;
+  onblur?: EventProp<Model, Msg, HTMLElementEventMap['blur'], Elem>;
+  oncancel?: EventProp<Model, Msg, HTMLElementEventMap['cancel'], Elem>;
+  oncanplay?: EventProp<Model, Msg, HTMLElementEventMap['canplay'], Elem>;
+  oncanplaythrough?: EventProp<Model, Msg, HTMLElementEventMap['canplaythrough'], Elem>;
+  onchange?: EventProp<Model, Msg, HTMLElementEventMap['change'], Elem>;
+  onclick?: EventProp<Model, Msg, HTMLElementEventMap['click'], Elem>;
+  onclose?: EventProp<Model, Msg, HTMLElementEventMap['close'], Elem>;
+  oncontextmenu?: EventProp<Model, Msg, HTMLElementEventMap['contextmenu'], Elem>;
+  oncuechange?: EventProp<Model, Msg, HTMLElementEventMap['cuechange'], Elem>;
+  ondblclick?: EventProp<Model, Msg, HTMLElementEventMap['dblclick'], Elem>;
+  ondrag?: EventProp<Model, Msg, HTMLElementEventMap['drag'], Elem>;
+  ondragend?: EventProp<Model, Msg, HTMLElementEventMap['dragend'], Elem>;
+  ondragenter?: EventProp<Model, Msg, HTMLElementEventMap['dragenter'], Elem>;
+  ondragexit?: EventProp<Model, Msg, HTMLElementEventMap['dragexit'], Elem>;
+  ondragleave?: EventProp<Model, Msg, HTMLElementEventMap['dragleave'], Elem>;
+  ondragover?: EventProp<Model, Msg, HTMLElementEventMap['dragover'], Elem>;
+  ondragstart?: EventProp<Model, Msg, HTMLElementEventMap['dragstart'], Elem>;
+  ondrop?: EventProp<Model, Msg, HTMLElementEventMap['drop'], Elem>;
+  ondurationchange?: EventProp<Model, Msg, HTMLElementEventMap['durationchange'], Elem>;
+  onemptied?: EventProp<Model, Msg, HTMLElementEventMap['emptied'], Elem>;
+  onended?: EventProp<Model, Msg, HTMLElementEventMap['ended'], Elem>;
+  onerror?: EventProp<Model, Msg, HTMLElementEventMap['error'], Elem>;
+  onfocus?: EventProp<Model, Msg, HTMLElementEventMap['focus'], Elem>;
+  ongotpointercapture?: EventProp<Model, Msg, HTMLElementEventMap['gotpointercapture'], Elem>;
+  oninput?: EventProp<Model, Msg, HTMLElementEventMap['input'], Elem>;
+  oninvalid?: EventProp<Model, Msg, HTMLElementEventMap['invalid'], Elem>;
+  onkeydown?: EventProp<Model, Msg, HTMLElementEventMap['keydown'], Elem>;
+  onkeypress?: EventProp<Model, Msg, HTMLElementEventMap['keypress'], Elem>;
+  onkeyup?: EventProp<Model, Msg, HTMLElementEventMap['keyup'], Elem>;
+  onload?: EventProp<Model, Msg, HTMLElementEventMap['load'], Elem>;
+  onloadeddata?: EventProp<Model, Msg, HTMLElementEventMap['loadeddata'], Elem>;
+  onloadedmetadata?: EventProp<Model, Msg, HTMLElementEventMap['loadedmetadata'], Elem>;
+  onloadend?: EventProp<Model, Msg, HTMLElementEventMap['loadend'], Elem>;
+  onloadstart?: EventProp<Model, Msg, HTMLElementEventMap['loadstart'], Elem>;
+  onlostpointercapture?: EventProp<Model, Msg, HTMLElementEventMap['lostpointercapture'], Elem>;
+  onmousedown?: EventProp<Model, Msg, HTMLElementEventMap['mousedown'], Elem>;
+  onmouseenter?: EventProp<Model, Msg, HTMLElementEventMap['mouseenter'], Elem>;
+  onmouseleave?: EventProp<Model, Msg, HTMLElementEventMap['mouseleave'], Elem>;
+  onmousemove?: EventProp<Model, Msg, HTMLElementEventMap['mousemove'], Elem>;
+  onmouseout?: EventProp<Model, Msg, HTMLElementEventMap['mouseout'], Elem>;
+  onmouseover?: EventProp<Model, Msg, HTMLElementEventMap['mouseover'], Elem>;
+  onmouseup?: EventProp<Model, Msg, HTMLElementEventMap['mouseup'], Elem>;
+  onpause?: EventProp<Model, Msg, HTMLElementEventMap['pause'], Elem>;
+  onplay?: EventProp<Model, Msg, HTMLElementEventMap['play'], Elem>;
+  onplaying?: EventProp<Model, Msg, HTMLElementEventMap['playing'], Elem>;
+  onpointercancel?: EventProp<Model, Msg, HTMLElementEventMap['pointercancel'], Elem>;
+  onpointerdown?: EventProp<Model, Msg, HTMLElementEventMap['pointerdown'], Elem>;
+  onpointerenter?: EventProp<Model, Msg, HTMLElementEventMap['pointerenter'], Elem>;
+  onpointerleave?: EventProp<Model, Msg, HTMLElementEventMap['pointerleave'], Elem>;
+  onpointermove?: EventProp<Model, Msg, HTMLElementEventMap['pointermove'], Elem>;
+  onpointerout?: EventProp<Model, Msg, HTMLElementEventMap['pointerout'], Elem>;
+  onpointerover?: EventProp<Model, Msg, HTMLElementEventMap['pointerover'], Elem>;
+  onpointerup?: EventProp<Model, Msg, HTMLElementEventMap['pointerup'], Elem>;
+  onprogress?: EventProp<Model, Msg, HTMLElementEventMap['progress'], Elem>;
+  onratechange?: EventProp<Model, Msg, HTMLElementEventMap['ratechange'], Elem>;
+  onreset?: EventProp<Model, Msg, HTMLElementEventMap['reset'], Elem>;
+  onresize?: EventProp<Model, Msg, HTMLElementEventMap['resize'], Elem>;
+  onscroll?: EventProp<Model, Msg, HTMLElementEventMap['scroll'], Elem>;
+  onsecuritypolicyviolation?: EventProp<Model, Msg, HTMLElementEventMap['securitypolicyviolation'], Elem>;
+  onseeked?: EventProp<Model, Msg, HTMLElementEventMap['seeked'], Elem>;
+  onseeking?: EventProp<Model, Msg, HTMLElementEventMap['seeking'], Elem>;
+  onselect?: EventProp<Model, Msg, HTMLElementEventMap['select'], Elem>;
+  onstalled?: EventProp<Model, Msg, HTMLElementEventMap['stalled'], Elem>;
+  onsubmit?: EventProp<Model, Msg, HTMLElementEventMap['submit'], Elem>;
+  onsuspend?: EventProp<Model, Msg, HTMLElementEventMap['suspend'], Elem>;
+  ontimeupdate?: EventProp<Model, Msg, HTMLElementEventMap['timeupdate'], Elem>;
+  ontoggle?: EventProp<Model, Msg, HTMLElementEventMap['toggle'], Elem>;
+  ontouchcancel?: EventProp<Model, Msg, HTMLElementEventMap['touchcancel'], Elem>;
+  ontouchend?: EventProp<Model, Msg, HTMLElementEventMap['touchend'], Elem>;
+  ontouchmove?: EventProp<Model, Msg, HTMLElementEventMap['touchmove'], Elem>;
+  ontouchstart?: EventProp<Model, Msg, HTMLElementEventMap['touchstart'], Elem>;
+  ontransitioncancel?: EventProp<Model, Msg, HTMLElementEventMap['transitioncancel'], Elem>;
+  ontransitionend?: EventProp<Model, Msg, HTMLElementEventMap['transitionend'], Elem>;
+  ontransitionrun?: EventProp<Model, Msg, HTMLElementEventMap['transitionrun'], Elem>;
+  ontransitionstart?: EventProp<Model, Msg, HTMLElementEventMap['transitionstart'], Elem>;
+  onvolumechange?: EventProp<Model, Msg, HTMLElementEventMap['volumechange'], Elem>;
+  onwaiting?: EventProp<Model, Msg, HTMLElementEventMap['waiting'], Elem>;
+  onwheel?: EventProp<Model, Msg, HTMLElementEventMap['wheel'], Elem>;
+} & {
+  [K in string]?: Prop<Model, any, Elem>;  
+};
+
+export type Omit<T, U extends keyof T> = { [K in Exclude<keyof T, U>]: T[K] };

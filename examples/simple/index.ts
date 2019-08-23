@@ -9,10 +9,10 @@ const view = h.div(
 
 const colors = ['#F44336', '#03A9F4', '#4CAF50', '#3F51B5', '#607D8B', '#FF5722'];
 const model = { value: new Date() };
-const el = view.create(sdom.observable.create(model), sdom.noop);
+const el = view.create(sdom.store.create(model), sdom.noop);
 document.body.appendChild(el);
 setInterval(tick, 1000);
 
 function tick() {
-  sdom.observable.next(model, new Date());
+  sdom.store.next(model, new Date());
 }
