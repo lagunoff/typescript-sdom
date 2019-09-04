@@ -2,7 +2,7 @@ import { PrimMsg } from './message';
 import * as messages from './message';
 import * as store from './store';
 import { Store, StoreSource, Updates } from './store';
-import { Lens } from './optic';
+import { Lens, Lens1 } from './optic';
 
 export { store, messages };
 
@@ -15,53 +15,42 @@ export { store, messages };
  */
 export const h = function h() {
   return element.apply(void 0, arguments);
-} as any as H<unknown, unknown>;
+} as any as H<unknown, unknown, unknown>;
 
 import './html';
 export * from './html';
 import { Props } from './html';
 
 /**
- * `SDOM<Model, Msg, Elem>` constructor for dynamic `Elem` node
+ * `SDOM<In, Out, Msg, Elem>` constructor for dynamic `Elem` node
  * 
  * @param Model type for data component needs to display itself
  * @param Msg type for messages component can fire during its lifecycle
  * @param Elem type of DOM node which will be constructed on 
  */
-export type SDOM<Model, Msg, Elem extends Node = Node> = {
-  create(model: Store<Model>, sink: Sink<PrimMsg<Model, Msg, Elem>>): Elem;
+export type SDOM<In, Out, Msg, Elem extends Node = Node> = {
+  create(model: Store<In>, sink: Sink<PrimMsg<In, Out, Msg, Elem>>): Elem;
 };
-export type HSDOM<Model, Msg, Elem extends Node = Node> = (h: H<Model, Msg>) => SDOM<Model, Msg, Elem>;
+export type HSDOM<In, Out, Msg, Elem extends Node = Node> = (h: H<In, Out, Msg>) => SDOM<In, Out, Msg, Elem>;
 export type Sink<T> = (x: T) => void;
-export type Interpreter<Model, Msg1, Msg2, Elem extends Node = Node> = (store: Store<Model>, sink: Sink<PrimMsg<Model, Msg2, Elem>>) => Sink<PrimMsg<Model, Msg1, Elem>>;
+export type Interpreter<In, Out, Msg1, Msg2, Elem extends Node = Node> = (store: Store<In>, sink: Sink<PrimMsg<In, Out, Msg2, Elem>>) => Sink<PrimMsg<In, Out, Msg1, Elem>>;
 
 /**
  * Type for `h` helper
  */
-export interface H<Model, Msg> {
-  (name: string, ...rest: Array<Props<Model, Msg>|SDOM<Model, Msg>|string|number|((m: Model) => string)>): SDOM<Model, Msg, HTMLElement>;
-  text(content: string|number|((m: Model) => string|number)): SDOM<Model, Msg, Text>;
-  // @ts-ignore
-  arrayC(name: string, props?: Props<Model, Msg>): (child: SDOM<Nested<Model['parent'], Model['here'][number]>, ItemMsg<Msg>>) => SDOM<Model, Msg, HTMLElement>;
-  // @ts-ignore
-  arrayCH(name: string, props?: Props<Model, Msg>): (child: HSDOM<Nested<Model['parent'], Model['here'][number]>, ItemMsg<Msg>>) => SDOM<Model, Msg, HTMLElement>;
-
-  discriminate<K extends string>(discriminator: (m: Model) => K, variants: Record<K, SDOM<Model, Msg>>): SDOM<Model, Msg>;
-  mapMessage<Msg2, Elem extends Node>(proj: (msg: Msg2) => Msg): (sdom: SDOM<Model, Msg2, Elem>) => SDOM<Model, Msg, Elem>;
-  interpretMsg<Msg2, Elem extends Node>(interp: Interpreter<Model, Msg, Msg2, Elem>): (s: SDOM<Model, Msg, Elem>) => SDOM<Model, Msg2, Elem>;
-  
-  omit<K extends Array<keyof Model>>(...keys: K): <Elem extends Node>(sdom: SDOM<Omit<Model, K[number]>, Msg, Elem>) => SDOM<Model, Msg, Elem>;
-  pick<K extends Array<keyof Model>>(...keys: K): <Elem extends Node>(sdom: SDOM<Pick<Model, K[number]>, Msg, Elem>) => SDOM<Model, Msg, Elem>;
-  at<K extends keyof Model>(k: K): <Elem extends Node>(sdom: SDOM<Model[K], Msg, Elem>) => SDOM<Model, Msg, Elem>;
-  atC<K extends keyof Model>(k: K): <Elem extends Node>(sdom: SDOM<Nested<Model, Model[K]>, Msg, Elem>) => SDOM<Model, Msg, Elem>;
-  atCH<K extends keyof Model>(k: K): <Elem extends Node>(sdom: (h: H<Nested<Model, Model[K]>, Msg>) => SDOM<Nested<Model, Model[K]>, Msg, Elem>) => SDOM<Model, Msg, Elem>;
-  atCH<K1 extends keyof Model, K2 extends keyof Model[K1]>(k1: K1, k2: K2): <Elem extends Node>(sdom: (h: H<Nested<Model, Model[K1][K2]>, Msg>) => SDOM<Nested<Model, Model[K1][K2]>, Msg, Elem>) => SDOM<Model, Msg, Elem>;
-  
-  focus<Model2>(lens: Lens<Model, Model2>): <Elem extends Node>(sdom: SDOM<Model2, Msg, Elem>) => SDOM<Model, Msg, Elem>;
-  focusH<Model2>(lens: Lens<Model, Model2>): <Elem extends Node>(sdom: (h: H<Model2, Msg>) => SDOM<Model2, Msg, Elem>) => SDOM<Model, Msg, Elem>;
-  focusC<Model2>(lens: Lens<Model, Model2>): <Elem extends Node>(sdom: SDOM<Nested<Model, Model2>, Msg, Elem>) => SDOM<Model2, Msg, Elem>;
-
-  ask<Elem extends Node>(create: (m: Model) => SDOM<Model, Msg, Elem>): SDOM<Model, Msg, Elem>;
+export interface H<In, Out, Msg> {
+  (name: string, ...rest: Array<Props<In, Out, Msg>|SDOM<In, Out, Msg>|string|number|((m: In) => string)>): SDOM<In, Out, Msg, HTMLElement>;
+  text(content: string|number|((m: In) => string|number)): SDOM<In, Out, Msg, Text>;
+  array<Msg, X>(lens: Lens<In, Out, X[], X[]>, name: string, props?: Props<In, Out, Msg>): (child: SDOM<Nested<In, X>, X, ItemMsg<Msg>>) => SDOM<In, Out, Msg, HTMLElement>;
+  arrayH<Msg, X>(lens: Lens<In, Out, X[], X[]>, name: string, props?: Props<In, Out, Msg>): (child: HSDOM<Nested<In, X>, X, ItemMsg<Msg>>) => SDOM<In, Out, Msg, HTMLElement>;
+  discriminate<K extends string>(discriminator: (m: In) => K, variants: Record<K, SDOM<In, Out, Msg>>): SDOM<In, Out, Msg>;
+  interpretMsg<Msg2, Elem extends Node>(interp: Interpreter<In, Out, Msg, Msg2, Elem>): (s: SDOM<In, Out, Msg, Elem>) => SDOM<In, Out, Msg2, Elem>;
+  focus<In2, Out2>(lens: Lens<In, In2, Out, Out2>): <Elem extends Node>(sdom: SDOM<In, Out2, Msg, Elem>) => SDOM<In, Out, Msg, Elem>;
+  ask<Elem extends Node>(create: (m: In) => SDOM<In, Out, Msg, Elem>): SDOM<In, Out, Msg, Elem>;
+  mapMessage<Msg2, Elem extends Node>(proj: (msg: Msg2) => Msg): (sdom: SDOM<In, Out, Msg2, Elem>) => SDOM<In, Out, Msg, Elem>;
+  comapInput<In2>(coproj: (m: In) => In2): <Elem extends Node>(s: SDOM<In2, Out, Msg, Elem>) => SDOM<In, Out, Msg, Elem>;
+  mapOutput<Out2>(proj: (m: Out2) => Out): <Elem extends Node>(s: SDOM<In, Out2, Msg, Elem>) => SDOM<In, Out, Msg, Elem>;
+  embed<In1, Out1, Msg1>(sdom: SDOM<In1, Out1, Msg1>, interp: Interpreter<In1, Out1, Msg1, Msg>, proj: (m: Out1) => Out, coproj: (m: In) => In1): SDOM<In, Out, Msg>;
 }
 
 /**
@@ -73,7 +62,7 @@ export interface H<Model, Msg> {
  * 
  *     type Model = { counter: number };
  *     type Msg = 'Click';
- *     const h = sdom.create<Model, Msg>();
+ *     const h = sdom.create<In, Out, Msg>();
  *     const view = h.div(
  *         h.p(m => `You clicked ${m.counter} times`),
  *         h.button('Click here', { onclick: () => 'Click' }),
@@ -83,7 +72,7 @@ export interface H<Model, Msg> {
  *     assert.instanceOf(el.childNodes[0], HTMLParagraphElement);
  *     assert.instanceOf(el.childNodes[1], HTMLButtonElement);
  */
-export function create<Model, Msg>(): H<Model, Msg> {
+export function create<In, Out, Msg>(): H<In, Out, Msg> {
   return h as any;
 }
 
@@ -94,12 +83,12 @@ export function create<Model, Msg>(): H<Model, Msg> {
  *    const inst = sdom.attach(view, document.body, {});
  *    assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
  */
-export function attach<Model, Msg, Elem extends Node>(view: SDOM<Model, Msg, Elem>, rootEl: HTMLElement, init: Model, interp: Interpreter<Model, Msg, never, Elem>): SDOMInstance<Model, Msg, Elem> {
+export function attach<Model, Msg, Elem extends Node>(view: SDOM<Model, Model, Msg, Elem>, rootEl: HTMLElement, init: Model, sink: Sink<Msg>): SDOMInstance<Model, Msg, Elem> {
   const model: StoreSource<Model> = { value: init, subscriptions: [] };
-  return new SDOMInstance(rootEl, model, view, interp);
+  return new SDOMInstance(rootEl, model, view, sink);
 }
 
-export type ElementContent<Model, Msg, Elem extends Node> = Props<Model, Msg, Elem>|SDOM<Model, Msg>|string|number|((m: Model) => string);
+export type ElementContent<In, Out, Msg, Elem extends Node> = Props<In, Out, Msg, Elem>|SDOM<In, Out, Msg>|string|number|((m: In) => string);
 export type Many<T> = T|T[];
 
 /**
@@ -110,12 +99,12 @@ export type Many<T> = T|T[];
  *    assert.instanceOf(el, HTMLAnchorElement);
  *    assert.equal(el.hash, '#link');
  */
-export function element<Model, Msg>(name: string, ...rest: Many<ElementContent<Model, Msg, HTMLElement>>[]): SDOM<Model, Msg, HTMLElement> {
-  const childs: SDOM<Model, Msg, Node>[] = [];
+export function element<In, Out, Msg>(name: string, ...rest: Many<ElementContent<In, Out, Msg, HTMLElement>>[]): SDOM<In, Out, Msg, HTMLElement> {
+  const childs: SDOM<In, Out, Msg, Node>[] = [];
   const attrs: Array<[string, string]> = [];
-  const dynamicAttrs: Array<[string, (m: Model, el: HTMLElement) => string]> = [];
+  const dynamicAttrs: Array<[string, (m: In, el: HTMLElement) => string]> = [];
   const props: Array<[string, any]> = [];
-  const dynamicProps: Array<[string, (m: Model) => any]> = [];
+  const dynamicProps: Array<[string, (m: In) => any]> = [];
   const events: Array<[string, Function]> = [];
 
   rest.forEach(prepareContent);
@@ -165,7 +154,7 @@ export function element<Model, Msg>(name: string, ...rest: Many<ElementContent<M
       }
       return el;
 
-      function childSink(idx: number): Sink<PrimMsg<Model, Msg, HTMLElement>> {
+      function childSink(idx: number): Sink<PrimMsg<In, Out, Msg, HTMLElement>> {
         return msg => {
           if (messages.isMessage(msg)) return sink(msg);
           if (msg.tag === '@@Ref') {
@@ -178,7 +167,7 @@ export function element<Model, Msg>(name: string, ...rest: Many<ElementContent<M
       }
 
       // Update existing element
-      function onNext({ next }: Updates<Model>) {
+      function onNext({ next }: Updates<In>) {
         dynamicProps.forEach(([k, fn]) => el[k] = fn(next));
         dynamicAttrs.forEach(([k, fn]) => el.setAttribute(k, fn(next, el)));
       }
@@ -202,7 +191,7 @@ export function element<Model, Msg>(name: string, ...rest: Many<ElementContent<M
  *    sdom.store.next(model, 5);
  *    assert.equal(el.nodeValue, 'You have 5 unread messages');
  */
-export function text<Model, Msg>(value: string|number|((m: Model) => string|number)): SDOM<Model, Msg, Text> {
+export function text<In, Out, Msg>(value: string|number|((m: In) => string|number)): SDOM<In, Out, Msg, Text> {
   return {
     // Create new text node
     create(model) {
@@ -229,7 +218,7 @@ export type ItemMsg<Msg> = ((idx: number) => Msg) | never;
  *    assert.instanceOf(el, HTMLUListElement);
  *    assert.equal(el.childNodes[3].innerHTML, 'Four');
  */
-export function arrayC<Model extends Nested<any, any[]>, Msg>(name: string, props: Props<Model, Msg> = {}): (child: SDOM<Nested<Model['parent'], Model['here'][number]>, ItemMsg<Msg>>) => SDOM<Model, Msg, HTMLElement> {
+export function array<In, Out, Msg, X>(lens: Lens<In, Out, X[], X[]>, name: string, props: Props<In, Out, Msg> = {}): (child: SDOM<Nested<In, X>, X, ItemMsg<Msg>>) => SDOM<In, Out, Msg, HTMLElement> {
   const rootSdom = element(name, props);
   return child => {
     const storeSources: StoreSource<any>[] = [];
@@ -237,11 +226,11 @@ export function arrayC<Model extends Nested<any, any[]>, Msg>(name: string, prop
       // Create new DOM node
       create(model, sink) {
         const init = model.ask();
-        const xs = init.here;
+        const xs = lens.getter(init);
         const el = rootSdom.create(model, sink);
         
         xs.forEach((here, idx) => {
-          const storeSource = { value: { here, parent: init.parent }, subscriptions: [] };
+          const storeSource = { value: { here, parent: init }, subscriptions: [] };
           const childEl = child.create(store.create<any>(storeSource), childSink(idx));
           storeSources.push(storeSource);
           el.appendChild(childEl);
@@ -250,7 +239,7 @@ export function arrayC<Model extends Nested<any, any[]>, Msg>(name: string, prop
         
         return el;
         
-        function childSink(idx: number): Sink<PrimMsg<any, (idx: number) => Msg, HTMLElement>> {
+        function childSink(idx: number): Sink<PrimMsg<any, any, (idx: number) => Msg, HTMLElement>> {
           return msg => {
             if (typeof(msg) === 'function') {
               return sink(msg(idx));              
@@ -261,11 +250,12 @@ export function arrayC<Model extends Nested<any, any[]>, Msg>(name: string, prop
               return;
             }
             if (msg.tag === '@@Step') {
-              const proj = (m: Nested<any, any>) => {
-                const newChild = msg.proj({ parent: m.parent, here: m.here[idx] });
-                const here = m.here.slice();
-                here.splice(idx, 1, newChild.here);
-                return { parent: newChild.parent, here } as any;
+              const proj = (parent: In) => {
+                const here = lens.getter(parent)[idx];
+                const newChild = msg.proj({ parent, here });
+                const newXs = lens.getter(parent).slice();
+                newXs.splice(idx, 1, newChild);
+                return lens.setter(newXs, parent);
               }
               return sink({ tag: '@@Step', proj });
             }
@@ -273,9 +263,9 @@ export function arrayC<Model extends Nested<any, any[]>, Msg>(name: string, prop
           };
         }
 
-        function onNext({ prev, next }: Updates<Model>) {
-          const xs = next.here;
-          const xsPrev = prev.here;
+        function onNext({ prev, next }: Updates<In>) {
+          const xs = lens.getter(next);
+          const xsPrev = lens.getter(prev);
           let lastInserted: Node|null = null;
           for (let i =  Math.max(xs.length, xsPrev.length) - 1; i >= 0; i--) {
             const idx = i;
@@ -286,7 +276,7 @@ export function arrayC<Model extends Nested<any, any[]>, Msg>(name: string, prop
               el.removeChild(childEl);
               storeSources.splice(i, 1);
             } else if(!(i in xsPrev) && i in xs) {
-              const childModel = { value: { here: xs[i], parent: next.parent }, subscriptions: [] };
+              const childModel = { value: { here: xs[i], parent: next }, subscriptions: [] };
               const nextEl = child.create(store.create<any>(childModel), childSink(idx));
               storeSources.push(childModel);
 
@@ -298,7 +288,7 @@ export function arrayC<Model extends Nested<any, any[]>, Msg>(name: string, prop
                 lastInserted = nextEl;
               }            
             } else {
-              store.next(storeSources[i], { here: xs[i], parent: next.parent });
+              store.next(storeSources[i], { here: xs[i], parent: next });
             }
           }
         }
@@ -312,11 +302,11 @@ export function arrayC<Model extends Nested<any, any[]>, Msg>(name: string, prop
     };
   };
 }
-export function arrayCH<Model extends Nested<any, any[]>, Msg>(name: string, props: Props<Model, Msg> = {}): (child: HSDOM<Nested<Model['parent'], Model['here'][number]>, ItemMsg<Msg>>) => SDOM<Model, Msg, HTMLElement> {
-  return child => arrayC(name, props)(child(h as any))
+export function arrayH<In, Out, Msg, X>(lens: Lens<In, Out, X[], X[]>, name: string, props: Props<In, Out, Msg> = {}): (child: HSDOM<Nested<In, X>, X, ItemMsg<Msg>>) => SDOM<In, Out, Msg, HTMLElement> {
+  return child => array(lens, name, props)(child(h as any))
 }
 
-export function mapMessage<Model, Msg1, Msg2, Elem extends Node>(proj: (msg: Msg1) => Msg2, sdom: SDOM<Model, Msg1, Elem>): SDOM<Model, Msg2, Elem> {
+export function mapMessage<In, Out, Msg1, Msg2, Elem extends Node>(proj: (msg: Msg1) => Msg2, sdom: SDOM<In, Out, Msg1, Elem>): SDOM<In, Out, Msg2, Elem> {
   return ({
     create(model, sink) {
       return sdom.create(model, m => sink(messages.mapMessage(proj, m)));
@@ -324,7 +314,7 @@ export function mapMessage<Model, Msg1, Msg2, Elem extends Node>(proj: (msg: Msg
   });
 }
 
-export function focus<A, B>(lens: Lens<B, A>): <Msg, Elem extends Node>(sdom: SDOM<A, Msg, Elem>) => SDOM<B, Msg, Elem> {
+export function focus<S, T, A, B>(lens: Lens<S, T, A, B>): <Msg, Elem extends Node>(sdom: SDOM<A, B, Msg, Elem>) => SDOM<S, T, Msg, Elem> {
   return sdom => ({
     create(model, sink) {
       return sdom.create(store.mapStore(lens.getter, model), m => sink(messages.focus(lens, m)))
@@ -332,31 +322,7 @@ export function focus<A, B>(lens: Lens<B, A>): <Msg, Elem extends Node>(sdom: SD
   });
 }
 
-export function focusC<A, B>(lens: Lens<B, A>): <Msg, Elem extends Node>(sdom: SDOM<Nested<B, A>, Msg, Elem>) => SDOM<B, Msg, Elem> {
-  const lens_ = {
-    getter: parent => ({ parent, here: lens.getter(parent) }),
-    setter: (a, b) => lens.setter(a.here, b),
-  };
-  return sdom => ({
-    create(model, sink) {
-      return sdom.create(store.mapStore(lens_.getter, model), m => sink(messages.focus(lens_, m)))
-    },
-  });
-}
-
-export function at<Model, K extends keyof Model>(k: K): <Msg, Elem extends Node>(sdom: SDOM<Model[K], Msg, Elem>) => SDOM<Model, Msg, Elem>;
-export function at(...keys): (sdom: SDOM<any, any, any>) => SDOM<any, any, any> {
-  // @ts-ignore
-  return focus(Lens<any>().at(...keys));
-}
-
-export function atCH<Parent, Model, K extends keyof Model>(k: K): <Msg, Elem extends Node>(sdom: (h: H<Nested<Parent, Model[K]>, Msg>) => SDOM<Model[K], Msg, Elem>) => SDOM<Model, Msg, Elem>;
-export function atCH(...keys): (sdom: HSDOM<any, any, any>) => SDOM<any, any, any> {
-  // @ts-ignore
-  return sdom => focusC(Lens<Model>().at(...keys))(sdom(h));
-}
-
-export function ask<Model, Msg, Elem extends Node>(create: (m: Model) => SDOM<Model, Msg, Elem>): SDOM<Model, Msg, Elem> {
+export function ask<In, Out, Msg, Elem extends Node>(create: (m: In) => SDOM<In, Out, Msg, Elem>): SDOM<In, Out, Msg, Elem> {
   return {
     create: (store, sink) => {
       return create(store.ask()).create(store, sink);
@@ -364,15 +330,7 @@ export function ask<Model, Msg, Elem extends Node>(create: (m: Model) => SDOM<Mo
   };
 }
 
-export function pick<Model, K extends Array<keyof Model>>(...keys: K): <Msg, Elem extends Node>(sdom: SDOM<Pick<Model, K[number]>, Msg, Elem>) => SDOM<Model, Msg, Elem> {
-  return focus(Lens<Model>().pick(...keys));
-}
-
-export function omit<Model, K extends Array<keyof Model>>(...keys: K): <Msg, Elem extends Node>(sdom: SDOM<Omit<Model, K[number]>, Msg, Elem>) => SDOM<Model, Msg, Elem> {
-  return focus(Lens<Model>().omit(...keys));
-}
-
-export function interpretMsg<Model, Msg1, Msg2, Elem extends Node>(interp: (model: Store<Model>, sink: Sink<PrimMsg<Model, Msg2, Elem>>) => Sink<PrimMsg<Model, Msg1, Elem>>): (s: SDOM<Model, Msg1, Elem>) => SDOM<Model, Msg2, Elem> {
+export function interpretMsg<In, Out, Msg1, Msg2, Elem extends Node = Node>(interp: (model: Store<In>, sink: Sink<PrimMsg<In, Out, Msg2, Elem>>) => Sink<PrimMsg<In, Out, Msg1, Elem>>): (s: SDOM<In, Out, Msg1, Elem>) => SDOM<In, Out, Msg2, Elem> {
   return sdom => ({
     create(model, sink) {
       return sdom.create(model, interp(model, sink));
@@ -401,7 +359,7 @@ export function interpretMsg<Model, Msg1, Msg2, Elem extends Node>(interp: (mode
  *    sdom.store.next(model, { ...model.value, tab: 'Comments' });
  *    assert.equal(el.childNodes[0].id, 'comments'); 
  */
-export function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, alternatives: Record<K, SDOM<Model, Msg, El>>): SDOM<Model, Msg, El> {
+export function discriminate<In, Out, Msg, El extends Node, K extends string>(discriminator: (m: In) => K, alternatives: Record<K, SDOM<In, Out, Msg, El>>): SDOM<In, Out, Msg, El> {
   return {
     // Create new node
     create(model, sink) {
@@ -412,7 +370,7 @@ export function discriminate<Model, Msg, El extends Node, K extends string>(disc
       return el;
       
       // Update existing text node
-      function onNext({ prev, next }: Updates<Model>) {
+      function onNext({ prev, next }: Updates<In>) {
         const prevKey = discriminator(prev);
         const nextKey = discriminator(next);
         if (prevKey !== nextKey) {
@@ -434,6 +392,56 @@ export function discriminate<Model, Msg, El extends Node, K extends string>(disc
   };
 }
 
+export function comapInput<In1, In2>(coproj: (m: In2) => In1): <Out, Msg, Elem extends Node>(s: SDOM<In1, Out, Msg, Elem>) => SDOM<In2, Out, Msg, Elem> {
+  return sui => {
+    return {
+      create(model, sink) {
+        return sui.create(store.mapStore(coproj, model), msg => sink(messages.dimapModel(coproj, a => a, msg)));
+      },
+    };
+  };
+}
+
+export function mapOutput<Out1, Out2>(proj: (m: Out1) => Out2): <In, Msg, Elem extends Node>(s: SDOM<In, Out1, Msg, Elem>) => SDOM<In, Out2, Msg, Elem> {
+  return sui => {
+    return {
+      create(model, sink) {
+        return sui.create(model, msg => sink(messages.dimapModel(a => a, proj, msg)));
+      },
+    };
+  };
+}
+
+export function embed<In1, Out1, Msg1, In2, Out2, Msg2>(sdom: SDOM<In1, Out1, Msg1>, interp: Interpreter<In1, Out1, Msg1, Msg2>, proj: (m: Out1) => Out2, coproj: (m: In2) => In1): SDOM<In2, Out2, Msg2> {
+  return dimap(coproj, proj)(interpretMsg(interp)(sdom));
+}
+
+/**
+ * Change both type parameters inside `SDOM<Model, Msg>`.
+ * 
+ *    type Model1 = { btnTitle: string };
+ *    type Msg1 = { tag: 'Clicked' };
+ *    type Model2 = string;
+ *    type Msg2 = 'Clicked';
+ *    let latestMsg: any = void 0;
+ *    const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+ *    const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+ *    const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+ *    el.click();
+ *    assert.instanceOf(el, HTMLButtonElement);
+ *    assert.equal(el.textContent, 'Click on me');
+ *    assert.deepEqual(latestMsg, { tag: 'Clicked' });
+ */
+export function dimap<In1, Out1, In2, Out2>(coproj: (m: In2) => In1, proj: (m: Out1) => Out2): <Msg, Elem extends Node>(s: SDOM<In1, Out1, Msg, Elem>) => SDOM<In2, Out2, Msg, Elem> {
+  return sui => {
+    return {
+      create(model, sink) {
+        return sui.create(store.mapStore(coproj, model), msg => sink(messages.dimapModel(coproj, proj, msg)));
+      },
+    };
+  };
+}
+
 export const id = <A>(a: A) => a;
 export const noop = () => {};
 
@@ -452,16 +460,16 @@ export class SDOMInstance<Model, Msg, Elem extends Node> {
   constructor (
     readonly rootEl: HTMLElement,
     readonly model: StoreSource<Model>,
-    readonly view: SDOM<Model, Msg, Elem>,
-    readonly interpreter: Interpreter<Model, Msg, never, Elem>,
+    readonly view: SDOM<Model, Model, Msg, Elem>,
+    readonly sink: Sink<Msg>,
   ) {
     const modelStore = store.create(model);
-    this.currentElement = view.create(modelStore, interpreter(modelStore, this.handleMsg));
+    this.currentElement = view.create(modelStore, this.handleMsg);
     rootEl.appendChild(this.currentElement);
     this.currentModel = model.value;
   }
 
-  handleMsg = (msg: PrimMsg<Model, never, Elem>) => {
+  handleMsg = (msg: PrimMsg<Model, Model, never, Elem>) => {
     if (msg.tag === '@@Step') {
       this.step(msg.proj(this.currentModel));
       return;
@@ -472,6 +480,7 @@ export class SDOMInstance<Model, Msg, Elem extends Node> {
       }
       return;
     }
+    this.sink(msg);
   };
 
   updateIfNeeded = () => {
@@ -506,19 +515,23 @@ export class SDOMInstance<Model, Msg, Elem extends Node> {
 
 Object.assign(h, {
   text,
-  arrayC,
-  arrayCH,
+  array,
+  arrayH,
   discriminate,
   interpretMsg,
-  omit,
-  pick,
-  at,
-  atCH,
   focus,
   ask,
+  comapInput,
+  mapOutput,
+  dimap,
+  embed,
 });
 
-export function isSDOM(input: any): input is SDOM<any, any> {
+export function identity<A>(a: A): A {
+  return a;
+}
+
+export function isSDOM(input: any): input is SDOM<any, any, any> {
   return input && typeof(input.create) === 'function';
 }
 

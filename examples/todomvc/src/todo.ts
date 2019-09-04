@@ -1,6 +1,6 @@
 import * as sdom from '../../../src/index';
-import { Nested } from '../../../src/index';
-import { MakeProps, withInterpreter, simpleInterpreter, withDefault } from './component';
+import { simpleInterpreter } from './component';
+import { Interpreter, SDOM } from '../../../src/index';
 
 // Model
 export type Model = {
@@ -10,9 +10,10 @@ export type Model = {
 };
 
 // Extra data provided by parent component. Much like props in ReactJS
-export type Props<Ctx> = MakeProps<Ctx, Model, {
+export type Props = {
+  model: Model;
   hidden: boolean;
-}>;
+};
 
 // Msg
 export type Msg =
@@ -29,7 +30,7 @@ export function init(title: string): Model {
 }
 
 // Update
-export function update(msg: Msg, model: Model): Model {
+export function update(msg: Msg, { model }: Props): Model {
   switch (msg.tag) {
     case 'Completed': return { ...model, completed: !model.completed };
     case 'Destroy': return model;
@@ -47,46 +48,39 @@ export function update(msg: Msg, model: Model): Model {
     }
   }
 }
-
-// View
-export function view<Ctx>(props: Props<Ctx>) {
-  type PublicModel = Nested<Ctx, Model>;
-  
-  const h = sdom.create<PublicModel, Msg>();
-  const rootClass = (m: PublicModel) => [m.here.completed ? 'completed' : '', m.here.editing !== null ? 'editing' : ''].filter(Boolean).join(' ');
-  const rootStyle = (m: PublicModel) => props.hidden(m) ? 'display: none;' : '';
-
-  return h.li(
-    { className: rootClass, style: rootStyle },
-
-    h.div(
-      { className: 'view', ondblclick: event => ({ tag: 'Editing/on', event }) },
-      
-      h.input({
-        className: 'toggle',
-        type: 'checkbox',
-        checked: m => m.here.completed,
-        onclick: { tag: 'Completed' },
-      }),
-      
-      h.label(m => m.here.title),
-      
-      h.button({ className: 'destroy', onclick: { tag: 'Destroy' } }),
-    ),
-    
-    h.input({
-      className: 'edit',
-      value: m => m.here.editing !== null ? m.here.editing : m.here.title,
-      oninput: e => ({ tag: 'Editing/input', value: e.currentTarget.value }),
-      onblur: { tag: 'Editing/commit' },
-      onkeydown: handleKeydown,
-    }),
-  );
-}
-
 export const interpereter = simpleInterpreter(update);
 
-export default withDefault(0 as any as Model)(withInterpreter(interpereter)(view));
+// View
+const h = sdom.create<Props, Model, Msg>();
+const rootClass = (m: Props) => [m.model.completed ? 'completed' : '', m.model.editing !== null ? 'editing' : ''].filter(Boolean).join(' ');
+const rootStyle = (m: Props) => m.hidden ? 'display: none;' : '';
+
+export const view = h.li(
+  { className: rootClass, style: rootStyle },
+
+  h.div(
+    { className: 'view', ondblclick: event => ({ tag: 'Editing/on', event }) },
+    
+    h.input({
+      className: 'toggle',
+      type: 'checkbox',
+      checked: m => m.model.completed,
+      onclick: { tag: 'Completed' },
+    }),
+    
+    h.label(m => m.model.title),
+    
+    h.button({ className: 'destroy', onclick: { tag: 'Destroy' } }),
+  ),
+  
+  h.input({
+    className: 'edit',
+    value: m => m.model.editing !== null ? m.model.editing : m.model.title,
+    oninput: e => ({ tag: 'Editing/input', value: e.currentTarget.value }),
+    onblur: { tag: 'Editing/commit' },
+    onkeydown: handleKeydown,
+  }),
+);
 
 function handleKeydown(event: KeyboardEvent): Msg|void {
   if (event.keyCode === KEY_ENTER) return { tag: 'Editing/commit' };
@@ -95,6 +89,3 @@ function handleKeydown(event: KeyboardEvent): Msg|void {
 
 const KEY_ENTER = 13;
 const KEY_ESCAPE = 27;
-
-
-export type Omit<T, U extends keyof T> = { [K in Exclude<keyof T, U>]: T[K] };

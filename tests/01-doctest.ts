@@ -4,12 +4,152 @@ import * as sdom from '../src';
 const h = sdom.create();
 
 
+// --[ src/optic.ts ]--
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
+
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
+
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
+
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
+
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
+
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
+
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
+
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
+
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
+
+describe("compose", () => {
+  it('test #1', () => {
+    const lens = optics.identityLens();
+    const prism = optics.identityPrism();
+    const iso = optics.identityIso();
+    assert.isTrue(optics.isLens(optics.compose(lens, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(prism, prism)));
+    assert.isTrue(optics.isIso(optics.compose(iso, iso)));
+    assert.isTrue(optics.isLens(optics.compose(iso, lens)));
+    assert.isTrue(optics.isPrism(optics.compose(iso, prism)));
+    assert.isTrue(optics.isCompose(optics.compose(lens, prism)));
+  });
+});
 // --[ src/index.ts ]--
 describe("create", () => {
   it('test #1', () => {
      type Model = { counter: number };
      type Msg = 'Click';
-     const h = sdom.create<Model, Msg>();
+     const h = sdom.create<In, Out, Msg>();
      const view = h.div(
          h.p(m => `You clicked ${m.counter} times`),
          h.button('Click here', { onclick: () => 'Click' }),
@@ -77,5 +217,22 @@ describe("discriminate", () => {
     assert.equal(el.childNodes[0].textContent, 'This product is awesome');
     sdom.store.next(model, { ...model.value, tab: 'Comments' });
     assert.equal(el.childNodes[0].id, 'comments');
+  });
+});
+
+describe("dimap", () => {
+  it('test #1', () => {
+    type Model1 = { btnTitle: string };
+    type Msg1 = { tag: 'Clicked' };
+    type Model2 = string;
+    type Msg2 = 'Clicked';
+    let latestMsg: any = void 0;
+    const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+    const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+    const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+    el.click();
+    assert.instanceOf(el, HTMLButtonElement);
+    assert.equal(el.textContent, 'Click on me');
+    assert.deepEqual(latestMsg, { tag: 'Clicked' });
   });
 });

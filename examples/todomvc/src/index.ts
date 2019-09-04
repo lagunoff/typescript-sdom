@@ -1,10 +1,12 @@
-import { attach, Nested } from '../../../src/index';
+import { attach, ItemMsg, identity } from '../../../src/index';
 import * as sdom from '../../../src/index';
 import * as todo from './todo';
 import { Prop } from '../../../src/html';
 import css from './css';
+import * as optic from '../../../src/optic';
 
-const h = sdom.create<Model, Msg>();
+const h = sdom.create<Model, Model, Msg>();
+const Lens = optic.Lens<Model>();
 
 // Model
 export type Model = {
@@ -56,9 +58,9 @@ export function update(msg: Msg, model: Model): Model {
   }
 }
 
-const todoInterpreter: sdom.Interpreter<Nested<any, todo.Model>, todo.Msg, (idx: number) => Msg> = (store, sink) => msg => {
+const todoInterpreter: sdom.Interpreter<todo.Props, todo.Model, todo.Msg, ItemMsg<Msg>> = (store, sink) => msg => {
   if (msg.tag === 'Destroy') return sink(idx => ({ tag: 'Destroy', idx }));
-  if (msg.tag === 'Editing/commit' && store.ask().here.editing === '') return sink(idx => ({ tag: 'Destroy', idx }));
+  if (msg.tag === 'Editing/commit' && store.ask().model.editing === '') return sink(idx => ({ tag: 'Destroy', idx }));
   todo.interpereter(store, sink)(msg);
 };
 
@@ -95,14 +97,11 @@ export const view = h.div(
       
       h.label('Mark all as complete', { for: 'toggle-all' }),
 
-      h.atCH('todos')(
-        h => h.array('ul', { className: 'todo-list' })(
-          sdom.interpretMsg(todoInterpreter)(
-            todo.view({
-              hidden: m => !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.here.completed) || (m.parent.filter === 'active' && !m.here.completed)),
-            })
-          ),
-        ),
+      h.array(Lens.at('todos'), 'ul', { className: 'todo-list' })(
+        sdom.embed(todo.view, todoInterpreter, identity, m => ({
+          model: m.here,
+          hidden: !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.here.completed) || (m.parent.filter === 'active' && !m.here.completed)),
+        })),
       ),
       
       h.footer(
@@ -150,7 +149,6 @@ function filterFromHash(hash: string): Filter {
   if (hash === '#/active') return 'active';
   return 'all';
 }
-
 
 function dispatch(msg: Msg) {
   const next = update(msg, inst.currentModel);

@@ -121,9 +121,29 @@ and also to setup notifications for future changes.
  - [ ] Improve performance for large arrays with https://github.com/ashaffer/mini-hamt
 
 ## API reference
+#### h
+
+`function h(name: string, ...rest: Array<string | number | Props<unknown, unknown, unknown, HTMLElement> | SDOM<unknown, unknown, unknown, Node> | ((m: unknown) => string)>): SDOM<unknown, unknown, unknown, HTMLElement>;`
+
+An alias for `elem`. Also a namespace for the most [common html
+tags](./src/html.ts) and all public API. All functions exposed by
+`h` have their `Model` and `Msg` parameters bound, see docs for
+`create`, see also [todomvc](examples/todomvc/src/index.ts) for
+usage examples
+
+#### type SDOM
+
+```ts
+export type SDOM<In, Out, Msg, Elem extends Node = Node> = {
+  create(model: Store<In>, sink: Sink<PrimMsg<In, Out, Msg, Elem>>): Elem;
+};
+```
+
+`SDOM<In, Out, Msg, Elem>` constructor for dynamic `Elem` node
+
 #### create
 
-`function create<Model, Msg>(): H<Model, Msg>;`
+`function create<In, Out, Msg>(): H<In, Out, Msg>;`
 
 Bind type parameters for `h`. This function does nothing at runtime
 and just returns `h` singleton which exposes all API with bound
@@ -134,30 +154,20 @@ library. You dont need this in JS code.
 ```ts
  type Model = { counter: number };
  type Msg = 'Click';
- const h = sdom.create<Model, Msg>();
+ const h = sdom.create<In, Out, Msg>();
  const view = h.div(
      h.p(m => `You clicked ${m.counter} times`),
      h.button('Click here', { onclick: () => 'Click' }),
  );
  const model = { value: { counter: 0 } };
- const el = view.create(sdom.observable.create(model), sdom.noop);
+ const el = view.create(sdom.store.create(model), sdom.noop);
  assert.instanceOf(el.childNodes[0], HTMLParagraphElement);
  assert.instanceOf(el.childNodes[1], HTMLButtonElement);
 ```
 
-#### h
-
-`function h(name: string, ...rest: Array<string | number | Props<unknown, unknown, HTMLElement> | SUI<unknown, unknown, Node> | ((m: unknown) => string)>): SUI<unknown, unknown, HTMLElement>;`
-
-An alias for `elem`. Also a namespace for the most [common html
-tags](./src/html.ts) and all public API. All functions exposed by
-`h` have their `Model` and `Msg` parameters bound, see docs for
-`create`, see also [todomvc](examples/todomvc/src/index.ts) for
-usage examples
-
 #### attach
 
-`function attach<Model, Msg, Elem extends Node>(view: SUI<Model, Msg, Elem>, rootEl: HTMLElement, init: Model, sink?: (a: Msg) => void): SDOMInstance<Model, Msg, Elem>;`
+`function attach<Model, Msg, Elem extends Node>(view: SDOM<Model, Model, Msg, Elem>, rootEl: HTMLElement, init: Model, sink: Sink<Msg>): SDOMInstance<Model, Msg, Elem>;`
 
 Start the application and attach it to `rootEl`
 
@@ -167,38 +177,38 @@ const inst = sdom.attach(view, document.body, {});
 assert.equal(document.getElementById('greeting').textContent, 'Hello world!');
 ```
 
-#### elem
+#### element
 
-`function elem<Model, Msg>(name: string, ...rest: Array<string | number | Props<Model, Msg, HTMLElement> | SUI<Model, Msg, Node> | ((m: Model) => string)>): SUI<Model, Msg, HTMLElement>;`
+`function element<In, Out, Msg>(name: string, ...rest: Array<Many<ElementContent<In, Out, Msg, HTMLElement>>>): SDOM<In, Out, Msg, HTMLElement>;`
 
 Create an html node. Attributes and contents can go in any order
 
 ```ts
-const view = sdom.elem('a', { href: '#link' });
-const el = view.create(sdom.observable.of({}), msg => {});
+const view = sdom.element('a', { href: '#link' });
+const el = view.create(sdom.store.of({}), msg => {});
 assert.instanceOf(el, HTMLAnchorElement);
 assert.equal(el.hash, '#link');
 ```
 
 #### text
 
-`function text<Model, Msg>(value: string | number | ((m: Model) => string | number)): SUI<Model, Msg, Text>;`
+`function text<In, Out, Msg>(value: string | number | ((m: In) => string | number)): SDOM<In, Out, Msg, Text>;`
 
 Create Text node
 
 ```ts
 const view = sdom.text(n => `You have ${n} unread messages`);
 const model = { value: 0 };
-const el = view.create(sdom.observable.create(model), sdom.noop);
+const el = view.create(sdom.store.create(model), sdom.noop);
 assert.instanceOf(el, Text);
 assert.equal(el.nodeValue, 'You have 0 unread messages');
-sdom.observable.next(model, 5);
+sdom.store.next(model, 5);
 assert.equal(el.nodeValue, 'You have 5 unread messages');
 ```
 
 #### array
 
-`function array<Model, Msg>(name: string, props?: Props<Model, Msg, HTMLElement>): <T extends Array<any>>(selector: (m: Model) => T, child: (h: H<Nested<Model, T[number]>, (idx: number) => Msg>) => SUI<Nested<Model, T[number]>, (idx: number) => Msg, Node>) => SUI<Model, Msg, HTMLElement>;`
+`function array<In, Out, Msg, X>(lens: Lens<In, Out, Array<X>, Array<X>>, name: string, props?: Props<In, Out, Msg, HTMLElement>): (child: SDOM<Nested<In, X>, X, (idx: number) => Msg, Node>) => SDOM<In, Out, Msg, HTMLElement>;`
 
 Create an html node which content is a dynamic list of child nodes
 
@@ -208,36 +218,14 @@ const view = h.array('ul', { class: 'list' })(
   h => h.li(m => m.here),
 );
 const list = ['One', 'Two', 'Three', 'Four'];
-const el = view.create(sdom.observable.of({ list }), msg => {});
+const el = view.create(sdom.store.of({ list }), msg => {});
 assert.instanceOf(el, HTMLUListElement);
 assert.equal(el.childNodes[3].innerHTML, 'Four');
 ```
 
-#### dimap
-
-`function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): <UI>(s: SUI<M1, A1, UI>) => SUI<M2, A2, UI>;
-function dimap<M1, M2, A1, A2>(coproj: (m: M2) => M1, proj: (m: A1) => A2): <UI>(s: (h: H<M1, A1>) => SUI<M1, A1, UI>) => SUI<M2, A2, UI>;`
-
-Change both type parameters inside `SDOM<Model, Msg>`.
-
-```ts
-type Model1 = { btnTitle: string };
-type Msg1 = { tag: 'Clicked' };
-type Model2 = string;
-type Msg2 = 'Clicked';
-let latestMsg: any = void 0;
-const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
-const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
-const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
-el.click();
-assert.instanceOf(el, HTMLButtonElement);
-assert.equal(el.textContent, 'Click on me');
-assert.deepEqual(latestMsg, { tag: 'Clicked' });
-```
-
 #### discriminate
 
-`function discriminate<Model, Msg, El extends Node, K extends string>(discriminator: (m: Model) => K, alternatives: Record<K, SUI<Model, Msg, El>>): SUI<Model, Msg, El>;`
+`function discriminate<In, Out, Msg, El extends Node, K extends string>(discriminator: (m: In) => K, alternatives: Record<K, SDOM<In, Out, Msg, El>>): SDOM<In, Out, Msg, El>;`
 
 Generic way to create `SDOM` which content depends on some
 condition on `Model`. First parameter checks this condition and
@@ -254,9 +242,30 @@ const view = h.div(sdom.discriminate(m => m.tab, {
     Comments: h.p({ id: 'comments' }, m => m.comments.join(', ')),
 }));
 const model = { value: { tab: 'Details', details: 'This product is awesome', comments: [`No it's not`] } };
-const el = view.create(sdom.observable.create(model), sdom.noop);
+const el = view.create(sdom.store.create(model), sdom.noop);
 assert.equal(el.childNodes[0].id, 'details'); 
 assert.equal(el.childNodes[0].textContent, 'This product is awesome');
-sdom.observable.next(model, { ...model.value, tab: 'Comments' });
+sdom.store.next(model, { ...model.value, tab: 'Comments' });
 assert.equal(el.childNodes[0].id, 'comments');
+```
+
+#### dimap
+
+`function dimap<In1, Out1, In2, Out2>(coproj: (m: In2) => In1, proj: (m: Out1) => Out2): <Msg, Elem extends Node>(s: SDOM<In1, Out1, Msg, Elem>) => SDOM<In2, Out2, Msg, Elem>;`
+
+Change both type parameters inside `SDOM<Model, Msg>`.
+
+```ts
+type Model1 = { btnTitle: string };
+type Msg1 = { tag: 'Clicked' };
+type Model2 = string;
+type Msg2 = 'Clicked';
+let latestMsg: any = void 0;
+const view01 = sdom.elem<Model2, Msg2>('button', (m: Model2) => m, { onclick: () => 'Clicked'});
+const view02 = sdom.dimap<Model1, Msg1, Model2, Msg2>(m => m.btnTitle, msg2 => ({ tag: 'Clicked' }))(view01);
+const el = view02.create(sdom.observable.of({ btnTitle: 'Click on me' }), msg => (latestMsg = msg));
+el.click();
+assert.instanceOf(el, HTMLButtonElement);
+assert.equal(el.textContent, 'Click on me');
+assert.deepEqual(latestMsg, { tag: 'Clicked' });
 ```
