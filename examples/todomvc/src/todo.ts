@@ -1,12 +1,18 @@
-import create from '../../../src/index';
-
-const h = create<Props, Msg>();
+import * as sdom from '../../../src/index';
+import { simpleInterpreter } from './component';
+import { Interpreter, SDOM } from '../../../src/index';
 
 // Model
 export type Model = {
   title: string;
   completed: boolean;
   editing: string|null;
+};
+
+// Extra data provided by parent component. Much like props in ReactJS
+export type Props = {
+  model: Model;
+  hidden: boolean;
 };
 
 // Msg
@@ -18,19 +24,13 @@ export type Msg =
   | { tag: 'Editing/cancel' }
   | { tag: 'Editing/commit' }
 
-// Extra fields to `Model` provided by parent component. Much like
-// props in ReactJS https://github.com/lagunoff/typescript-sdom/blob/fc943d5ff5297cbf64977f1e20275bf1d438a406/examples/todomvc/src/index.ts#L150
-export type Props = Model & {
-  hidden: boolean;
-}
-
 // Init
 export function init(title: string): Model {
   return { title, completed: false, editing: null };
 }
 
 // Update
-export function update(msg: Msg, model: Model): Model {
+export function update(msg: Msg, { model }: Props): Model {
   switch (msg.tag) {
     case 'Completed': return { ...model, completed: !model.completed };
     case 'Destroy': return model;
@@ -48,11 +48,13 @@ export function update(msg: Msg, model: Model): Model {
     }
   }
 }
-
-const rootClass = (m: Props) => [m.completed ? 'completed' : '', m.editing !== null ? 'editing' : ''].filter(Boolean).join(' ');
-const rootStyle = (m: Props) => m.hidden ? 'display: none;' : '';
+export const interpereter = simpleInterpreter(update);
 
 // View
+const h = sdom.create<Props, Model, Msg>();
+const rootClass = (m: Props) => [m.model.completed ? 'completed' : '', m.model.editing !== null ? 'editing' : ''].filter(Boolean).join(' ');
+const rootStyle = (m: Props) => m.hidden ? 'display: none;' : '';
+
 export const view = h.li(
   { className: rootClass, style: rootStyle },
 
@@ -62,20 +64,20 @@ export const view = h.li(
     h.input({
       className: 'toggle',
       type: 'checkbox',
-      checked: m => m.completed,
-      onclick: () => ({ tag: 'Completed' }),
+      checked: m => m.model.completed,
+      onclick: { tag: 'Completed' },
     }),
     
-    h.label(m => m.title),
+    h.label(m => m.model.title),
     
-    h.button({ className: 'destroy', onclick: () => ({ tag: 'Destroy' }) }),
+    h.button({ className: 'destroy', onclick: { tag: 'Destroy' } }),
   ),
   
   h.input({
     className: 'edit',
-    value: m => m.editing !== null ? m.editing : m.title,
+    value: m => m.model.editing !== null ? m.model.editing : m.model.title,
     oninput: e => ({ tag: 'Editing/input', value: e.currentTarget.value }),
-    onblur: () => ({ tag: 'Editing/commit' }),
+    onblur: { tag: 'Editing/commit' },
     onkeydown: handleKeydown,
   }),
 );
@@ -87,6 +89,3 @@ function handleKeydown(event: KeyboardEvent): Msg|void {
 
 const KEY_ENTER = 13;
 const KEY_ESCAPE = 27;
-
-
-export type Omit<T, U extends keyof T> = { [K in Exclude<keyof T, U>]: T[K] };

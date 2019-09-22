@@ -1,9 +1,12 @@
-import { attach, Nested, create } from '../../../src/index';
+import { attach, ItemMsg, identity } from '../../../src/index';
+import * as sdom from '../../../src/index';
 import * as todo from './todo';
-import { Prop } from '../../../src/props';
+import { Prop } from '../../../src/html';
 import css from './css';
+import * as optic from '../../../src/optic';
 
-const h = create<Model, Msg>();
+const h = sdom.create<Model, Model, Msg>();
+const Lens = optic.Lens<Model>();
 
 // Model
 export type Model = {
@@ -19,7 +22,7 @@ export type Msg =
   | { tag: 'ClearCompleted' }
   | { tag: 'KeyDown/enter' }
   | { tag: 'Hash/change', hash: string }
-  | { tag: '@Todo', idx: number, msg: todo.Msg }
+  | { tag: 'Destroy', idx: number }
 
 // Filter
 export type Filter = 'all'|'active'|'completed';
@@ -48,21 +51,18 @@ export function update(msg: Msg, model: Model): Model {
       const filter = filterFromHash(msg.hash);
       return { ...model, filter };
     }
-    case '@Todo': {
-      if (msg.msg.tag === 'Destroy') {
-        const todos = model.todos.filter((_, idx) => idx !== msg.idx);
-        return { ...model, todos };
-      }
-      if (msg.msg.tag === 'Editing/commit' && model.todos[msg.idx].editing === '') {
-        const todos = model.todos.filter((_, idx) => idx !== msg.idx);
-        return { ...model, todos };
-      }
-      const todos = model.todos.slice();
-      todos.splice(msg.idx, 1, todo.update(msg.msg, todos[msg.idx]));
+    case 'Destroy': {
+      const todos = model.todos.filter((_, idx) => idx !== msg.idx);
       return { ...model, todos };
-    };
+    }
   }
 }
+
+const todoInterpreter: sdom.Interpreter<todo.Props, todo.Model, todo.Msg, ItemMsg<Msg>> = (store, sink) => msg => {
+  if (msg.tag === 'Destroy') return sink(idx => ({ tag: 'Destroy', idx }));
+  if (msg.tag === 'Editing/commit' && store.ask().model.editing === '') return sink(idx => ({ tag: 'Destroy', idx }));
+  todo.interpereter(store, sink)(msg);
+};
 
 // View
 export const view = h.div(
@@ -92,17 +92,16 @@ export const view = h.div(
         className: 'toggle-all',
         type: 'checkbox',
         checked: allChecked,
-        onclick: () => ({ tag: 'ToggleAll' }),
+        onclick: { tag: 'ToggleAll' },
       }),
       
       h.label('Mark all as complete', { for: 'toggle-all' }),
 
-      h.array('ul', { className: 'todo-list' })(
-        m => m.todos,
-        h => h.dimap<todo.Props, todo.Msg>(
-          todoSelector,
-          msg => idx => ({ tag: '@Todo', msg, idx })
-        )(todo.view)
+      h.array(Lens.at('todos'), 'ul', { className: 'todo-list' })(
+        sdom.embed(todo.view, todoInterpreter, identity, m => ({
+          model: m.here,
+          hidden: !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.here.completed) || (m.parent.filter === 'active' && !m.here.completed)),
+        })),
       ),
       
       h.footer(
@@ -117,7 +116,7 @@ export const view = h.div(
           h.li(h.a('Completed', { href: '#/completed', className: selectedIf('completed') })),
         ),
         
-        h.button('Clear completed', { className: 'clear-completed', onclick: () => ({ tag: 'ClearCompleted' }) })
+        h.button('Clear completed', { className: 'clear-completed', onclick: { tag: 'ClearCompleted' } })
       ),
     ),
   ),
@@ -143,10 +142,6 @@ function allChecked(model: Model): boolean {
 
 function selectedIf(filter: Filter): Prop<Model, string> {
   return m => m.filter === filter ? 'selected' : '';
-}
-
-function todoSelector(m: Nested<Model, todo.Model>): todo.Props {
-  return { ...m.here, hidden: !(m.parent.filter === 'all' || (m.parent.filter === 'completed' && m.here.completed) || (m.parent.filter === 'active' && !m.here.completed)) };
 }
 
 function filterFromHash(hash: string): Filter {
